@@ -27,7 +27,8 @@ export class AuthService {
       where: { email },
     });
     if (existingUser) {
-      throw new ConflictException('User with this email already exists');
+      const roleText = existingUser.role === 'ambassador' ? 'Ambassador' : 'University';
+      throw new ConflictException(`This email is already registered as a ${roleText}. Please use a different email or login with your existing account.`);
     }
 
     // Hash password
@@ -70,30 +71,35 @@ export class AuthService {
   async login(loginDto: LoginDto): Promise<AuthResponseDto> {
     const { email, password, role } = loginDto;
 
-    // Find user by email and role using Prisma
-    const user = await this.prisma.user.findFirst({
-      where: { 
-        email,
-        role: role as any,
-      },
+    // First check if user exists with this email
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email },
     });
-    if (!user) {
+
+    if (!existingUser) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // Check if the role matches
+    if (existingUser.role !== role) {
+      const currentRoleText = existingUser.role === 'ambassador' ? 'Ambassador' : 'University';
+      const requestedRoleText = role === 'ambassador' ? 'Ambassador' : 'University';
+      throw new UnauthorizedException(`This email is registered as a ${currentRoleText}, not as a ${requestedRoleText}. Please login with the correct role.`);
+    }
+
     // Verify password
-    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    const isPasswordValid = await bcrypt.compare(password, existingUser.passwordHash);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
     // Generate JWT token
     const payload: UserPayload = {
-      sub: user.id,
-      email: user.email,
-      role: user.role as any,
-      fullName: user.fullName,
-      university: user.university,
+      sub: existingUser.id,
+      email: existingUser.email,
+      role: existingUser.role as any,
+      fullName: existingUser.fullName,
+      university: existingUser.university,
     };
 
     const accessToken = this.jwtService.sign(payload);
@@ -101,11 +107,11 @@ export class AuthService {
     return {
       accessToken,
       user: {
-        id: user.id,
-        fullName: user.fullName,
-        email: user.email,
-        university: user.university,
-        role: user.role,
+        id: existingUser.id,
+        fullName: existingUser.fullName,
+        email: existingUser.email,
+        university: existingUser.university,
+        role: existingUser.role,
       },
     };
   }
