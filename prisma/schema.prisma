@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -12,16 +9,86 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  fullName     String   @map("full_name")
-  email        String   @unique
-  university   String
-  passwordHash String   @map("password_hash")
-  role         UserRole
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id                String             @id @default(uuid())
+  fullName          String             @map("full_name")
+  email             String             @unique
+  university        String
+  passwordHash      String             @map("password_hash")
+  role              UserRole
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  ambassadorProfile AmbassadorProfile?
 
   @@map("users")
+}
+
+model AmbassadorProfile {
+  id                         String       @id @default(uuid())
+  userId                     String       @unique
+  subject                    String?
+  countryOriginal            String?      @map("country_original")
+  countryCurrent             String?      @map("country_current")
+  currentlyLivingCountry     String?      @map("currently_living_country")
+  phoneNumber                String?      @map("phone_number")
+  dob                        DateTime?
+  gender                     String?
+  languages                  String[]     @default([])
+  leaveAPYear                Int?         @map("leave_ap_year")
+  previousSchoolName         String?      @map("previous_school_name")
+  currentlyUniversityStudent String?      @map("currently_university_student")
+  currentUniversityName      String?      @map("current_university_name")
+  calendlyLink               String?      @map("calendly_link")
+  writtenContent             String?      @map("written_content")
+  writtenDetails             String?      @map("written_details")
+  profileImage               String?      @map("profile_image")
+  services                   String[]     @default([])
+  whyStudyingCourse          String?      @map("why_studying_course")
+  skilsExperience            String?      @map("skills_experience")
+  hobbiesInterests           String?      @map("hobbies_interests")
+  caringCauses               String?      @map("caring_causes")
+  accomplishmentsProudOf     String?      @map("accomplishments_proud_of")
+  answerQ1                   String?      @map("answer_q1")
+  answerQ2                   String?      @map("answer_q2")
+  answerQ3                   String?      @map("answer_q3")
+  answerQ4                   String?      @map("answer_q4")
+  question1                  String?      @map("question1")
+  question2                  String?      @map("question2")
+  question3                  String?      @map("question3")
+  isRegisteredAmbassador     String?      @map("is_registered_ambassador")
+  createdAt                  DateTime     @default(now()) @map("created_at")
+  updatedAt                  DateTime     @updatedAt @map("updated_at")
+  user                       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  following                  Following[]
+  socialLinks                SocialLinks?
+
+  @@map("ambassador_profiles")
+}
+
+model SocialLinks {
+  id           String            @id @default(uuid())
+  ambassadorId String            @unique @map("ambassador_id")
+  facebook     String?
+  instagram    String?
+  tiktok       String?
+  x            String?
+  linkedin     String?
+  youtube      String?
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+  ambassador   AmbassadorProfile @relation(fields: [ambassadorId], references: [id], onDelete: Cascade)
+
+  @@map("social_links")
+}
+
+model Following {
+  id           String            @id @default(uuid())
+  ambassadorId String            @map("ambassador_id")
+  platform     String
+  username     String
+  createdAt    DateTime          @default(now()) @map("created_at")
+  ambassador   AmbassadorProfile @relation(fields: [ambassadorId], references: [id], onDelete: Cascade)
+
+  @@map("following")
 }
 
 enum UserRole {
