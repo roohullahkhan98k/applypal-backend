@@ -74,7 +74,7 @@ export class UniversityController {
       return;
     }
 
-    const html = this.universityService.generateWidgetHTML(config);
+    const html = this.universityService.generateWidgetHTML(config, widgetId);
     
     res.setHeader('Content-Type', 'text/html');
     res.setHeader('X-Frame-Options', 'ALLOWALL');
@@ -103,5 +103,60 @@ export class UniversityController {
     }
     
     return config;
+  }
+
+  @Post('widget/iframe-loaded')
+  @Public()
+  @ApiOperation({ summary: 'Handle iframe load notification (Public Access)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Iframe load notification received successfully',
+  })
+  async handleIframeLoaded(
+    @Body() data: {
+      widgetId: string;
+      domain: string;
+      timestamp: string;
+      userAgent: string;
+    },
+  ): Promise<{ success: boolean; message: string }> {
+    return this.universityService.handleIframeLoaded(data);
+  }
+
+  @Post('widget/verify')
+  @ApiOperation({ summary: 'Verify iframe integration on website' })
+  @ApiResponse({
+    status: 200,
+    description: 'Verification completed',
+  })
+  async verifyIframeIntegration(
+    @Body() data: {
+      widgetId: string;
+      websiteUrl: string;
+    },
+  ): Promise<{ verified: boolean; message: string; details?: any }> {
+    return this.universityService.verifyIframeIntegration(data.widgetId, data.websiteUrl);
+  }
+
+  @Get('widget/:widgetId/status')
+  @Public()
+  @ApiOperation({ summary: 'Get iframe integration status for frontend (Public Access)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Integration status retrieved successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Widget not found',
+  })
+  async getIntegrationStatus(
+    @Param('widgetId') widgetId: string,
+  ): Promise<{
+    verified: boolean;
+    message: string;
+    details?: any;
+    statistics?: any;
+  }> {
+    return this.universityService.getIntegrationStatus(widgetId);
   }
 }

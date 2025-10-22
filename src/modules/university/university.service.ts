@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { WidgetConfigDto, WidgetResponseDto } from './dto/widget-config.dto';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class UniversityService {
+  private readonly logger = new Logger(UniversityService.name);
   private widgetStore = new Map<string, WidgetConfigDto>();
+  private iframeLoads = new Map<string, { domain: string; timestamp: string; userAgent: string }[]>();
 
   async generateWidget(config: WidgetConfigDto): Promise<WidgetResponseDto> {
     const widgetId = uuidv4();
@@ -30,6 +32,179 @@ export class UniversityService {
     return this.widgetStore.get(widgetId) || null;
   }
 
+  async handleIframeLoaded(data: {
+    widgetId: string;
+    domain: string;
+    timestamp: string;
+    userAgent: string;
+  }): Promise<{ success: boolean; message: string }> {
+    try {
+      const { widgetId, domain, timestamp, userAgent } = data;
+      
+      // Store the iframe load information
+      if (!this.iframeLoads.has(widgetId)) {
+        this.iframeLoads.set(widgetId, []);
+      }
+      
+      const loads = this.iframeLoads.get(widgetId);
+      loads.push({ domain, timestamp, userAgent });
+      
+      // Keep only last 10 loads per widget
+      if (loads.length > 10) {
+        loads.splice(0, loads.length - 10);
+      }
+      
+      // Enhanced logging with emojis and details
+      this.logger.log(`🎯 IFRAME INTEGRATION SUCCESS! Widget: ${widgetId}`);
+      this.logger.log(`📱 Domain: ${domain}`);
+      this.logger.log(`⏰ Timestamp: ${timestamp}`);
+      this.logger.log(`🌐 User Agent: ${userAgent.substring(0, 100)}...`);
+      this.logger.log(`📊 Total loads for this widget: ${loads.length}`);
+      this.logger.log(`✅ Integration Status: ACTIVE`);
+      
+      return {
+        success: true,
+        message: 'Iframe load notification received successfully'
+      };
+    } catch (error) {
+      console.error('Error handling iframe load notification:', error);
+      return {
+        success: false,
+        message: 'Failed to process iframe load notification'
+      };
+    }
+  }
+
+  async verifyIframeIntegration(widgetId: string, websiteUrl: string): Promise<{
+    verified: boolean;
+    message: string;
+    details?: any;
+  }> {
+    try {
+      // Check if we have iframe load data for this widget
+      const loads = this.iframeLoads.get(widgetId);
+      
+      if (!loads || loads.length === 0) {
+        return {
+          verified: false,
+          message: 'No iframe load data found. Please ensure the iframe is properly embedded and the page has been visited.',
+          details: {
+            suggestion: 'Make sure the iframe is embedded and someone has visited the page with the iframe'
+          }
+        };
+      }
+
+      // Extract domain from website URL
+      const targetDomain = new URL(websiteUrl).hostname;
+      
+      // Check if any loads match the target domain
+      const matchingLoads = loads.filter(load => 
+        load.domain === targetDomain || 
+        load.domain.includes(targetDomain) ||
+        targetDomain.includes(load.domain)
+      );
+
+      if (matchingLoads.length > 0) {
+        const latestLoad = matchingLoads[matchingLoads.length - 1];
+        return {
+          verified: true,
+          message: 'Iframe successfully verified on the website!',
+          details: {
+            domain: latestLoad.domain,
+            lastSeen: latestLoad.timestamp,
+            totalLoads: matchingLoads.length,
+            userAgent: latestLoad.userAgent
+          }
+        };
+      }
+
+      return {
+        verified: false,
+        message: `No iframe loads detected for domain: ${targetDomain}`,
+        details: {
+          availableDomains: loads.map(load => load.domain),
+          suggestion: 'Please visit the website with the embedded iframe and try again'
+        }
+      };
+    } catch (error) {
+      console.error('Error verifying iframe integration:', error);
+      return {
+        verified: false,
+        message: 'Error during verification process',
+        details: { error: error.message }
+      };
+    }
+  }
+
+  async getIntegrationStatus(widgetId: string): Promise<{
+    verified: boolean;
+    message: string;
+    details?: any;
+    statistics?: any;
+  }> {
+    try {
+      // Check if widget exists
+      const widgetConfig = this.widgetStore.get(widgetId);
+      if (!widgetConfig) {
+        return {
+          verified: false,
+          message: 'Widget not found',
+          details: { error: 'Invalid widget ID' }
+        };
+      }
+
+      // Get iframe load data
+      const loads = this.iframeLoads.get(widgetId);
+      
+      if (!loads || loads.length === 0) {
+        return {
+          verified: false,
+          message: 'No iframe loads detected yet',
+          details: {
+            suggestion: 'Embed the iframe code on your website and visit the page',
+            embedCodes: this.generateIframeFormats(widgetId)
+          },
+          statistics: {
+            totalLoads: 0,
+            uniqueDomains: 0,
+            lastSeen: null
+          }
+        };
+      }
+
+      // Calculate statistics
+      const uniqueDomains = [...new Set(loads.map(load => load.domain))];
+      const latestLoad = loads[loads.length - 1];
+      const totalLoads = loads.length;
+
+      return {
+        verified: true,
+        message: 'Iframe integration is active!',
+        details: {
+          latestDomain: latestLoad.domain,
+          lastSeen: latestLoad.timestamp,
+          totalLoads: totalLoads,
+          uniqueDomains: uniqueDomains.length,
+          allDomains: uniqueDomains
+        },
+        statistics: {
+          totalLoads: totalLoads,
+          uniqueDomains: uniqueDomains.length,
+          lastSeen: latestLoad.timestamp,
+          domains: uniqueDomains,
+          recentLoads: loads.slice(-5) // Last 5 loads
+        }
+      };
+    } catch (error) {
+      this.logger.error('Error getting integration status:', error);
+      return {
+        verified: false,
+        message: 'Error retrieving integration status',
+        details: { error: error.message }
+      };
+    }
+  }
+
   private generateIframeFormats(widgetId: string): any {
     const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
     const widgetUrl = `${baseUrl}/university/widget/${widgetId}`;
@@ -37,67 +212,64 @@ export class UniversityService {
     return {
       html: `<iframe 
   src="${widgetUrl}" 
-  width="auto" 
+  width="300" 
   height="300" 
   frameborder="0" 
   scrolling="no"
-  style="border: none; position: fixed; right: 20px; top: 50%; transform: translateY(-50%); z-index: 9999; min-width: 44px; max-width: 400px;"
+  style="border: none; position: fixed; right: -110px; top: 50%; transform: translateY(-50%); z-index: 9999; width: 300px;"
   title="University Navigation Widget">
 </iframe>`,
       
       react: `<iframe 
   src="${widgetUrl}" 
-  width="auto" 
+  width="300" 
   height="300" 
   frameBorder="0" 
   scrolling="no"
   style={{
     border: 'none',
     position: 'fixed',
-    right: '20px',
+    right: '-110px',
     top: '50%',
     transform: 'translateY(-50%)',
     zIndex: 9999,
-    minWidth: '44px',
-    maxWidth: '400px'
+    width: '300px'
   }}
   title="University Navigation Widget"
 />`,
       
       vue: `<iframe 
   :src="'${widgetUrl}'" 
-  width="auto" 
+  width="300" 
   height="300" 
   frameborder="0" 
   scrolling="no"
   :style="{
     border: 'none',
     position: 'fixed',
-    right: '20px',
+    right: '-110px',
     top: '50%',
     transform: 'translateY(-50%)',
     zIndex: 9999,
-    minWidth: '44px',
-    maxWidth: '400px'
+    width: '300px'
   }"
   title="University Navigation Widget">
 </iframe>`,
       
       angular: `<iframe 
   [src]="'${widgetUrl}'" 
-  width="auto" 
+  width="300" 
   height="300" 
   frameborder="0" 
   scrolling="no"
   [style]="{
     'border': 'none',
     'position': 'fixed',
-    'right': '20px',
+    'right': '-110px',
     'top': '50%',
     'transform': 'translateY(-50%)',
     'z-index': '9999',
-    'min-width': '44px',
-    'max-width': '400px'
+    'width': '300px'
   }"
   title="University Navigation Widget">
 </iframe>`,
@@ -105,22 +277,22 @@ export class UniversityService {
       wordpress: `<!-- Add this to your WordPress theme's footer.php or use a plugin -->
 <iframe 
   src="${widgetUrl}" 
-  width="auto" 
+  width="300" 
   height="300" 
   frameborder="0" 
   scrolling="no"
-  style="border: none; position: fixed; right: 20px; top: 50%; transform: translateY(-50%); z-index: 9999; min-width: 44px; max-width: 400px;"
+  style="border: none; position: fixed; right: -110px; top: 50%; transform: translateY(-50%); z-index: 9999; width: 300px;"
   title="University Navigation Widget">
 </iframe>`,
       
       shopify: `<!-- Add this to your Shopify theme's layout/theme.liquid file before </body> -->
 <iframe 
   src="${widgetUrl}" 
-  width="auto" 
+  width="300" 
   height="300" 
   frameborder="0" 
   scrolling="no"
-  style="border: none; position: fixed; right: 20px; top: 50%; transform: translateY(-50%); z-index: 9999; min-width: 44px; max-width: 400px;"
+  style="border: none; position: fixed; right: -110px; top: 50%; transform: translateY(-50%); z-index: 9999; width: 300px;"
   title="University Navigation Widget">
 </iframe>`
     };
@@ -132,16 +304,16 @@ export class UniversityService {
     
     return `<iframe 
   src="${widgetUrl}" 
-  width="auto" 
+  width="300" 
   height="300" 
   frameborder="0" 
   scrolling="no"
-  style="border: none; position: fixed; right: 20px; top: 50%; transform: translateY(-50%); z-index: 9999; min-width: 44px; max-width: 400px;"
+  style="border: none; position: fixed; right: -110px; top: 50%; transform: translateY(-50%); z-index: 9999; width: 300px;"
   title="University Navigation Widget">
 </iframe>`;
   }
 
-  generateWidgetHTML(config: WidgetConfigDto): string {
+  generateWidgetHTML(config: WidgetConfigDto, widgetId: string): string {
     const { selectedIcons = [], selectedColor = '#131e42', iconInputs = {} } = config;
     
     // SVG icon mapping (exact same as your Lucide icons)
@@ -243,10 +415,10 @@ export class UniversityService {
     
     .widget-wrapper {
       position: relative;
-      display: inline-block;
-      min-width: 44px;
-      max-width: 400px;
-      width: auto;
+      display: flex;
+      justify-content: flex-end;
+      width: 300px;
+      height: 100%;
     }
     
     .widget-icon {
@@ -334,20 +506,10 @@ export class UniversityService {
         tooltip.textContent = icon.getAttribute('data-tooltip');
         icon.appendChild(tooltip);
         
-        // Measure tooltip width when visible
+        // Show tooltip on hover
         icon.addEventListener('mouseenter', function() {
           tooltip.style.visibility = 'visible';
           tooltip.style.opacity = '1';
-          const tooltipWidth = tooltip.offsetWidth;
-          if (tooltipWidth > maxTooltipWidth) {
-            maxTooltipWidth = tooltipWidth;
-            // Adjust iframe width dynamically
-            const iframe = window.parent.document.querySelector('iframe[src*="university/widget"]');
-            if (iframe) {
-              const newWidth = Math.min(44 + maxTooltipWidth + 24, 400); // 44px widget + tooltip + 24px padding
-              iframe.style.width = newWidth + 'px';
-            }
-          }
         });
         
         icon.addEventListener('mouseleave', function() {
@@ -355,6 +517,24 @@ export class UniversityService {
           tooltip.style.opacity = '0';
         });
       });
+      
+      // Notify backend that iframe is loaded
+      try {
+        fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/iframe-loaded', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            widgetId: '${widgetId}',
+            domain: document.referrer || window.location.hostname,
+            timestamp: new Date().toISOString(),
+            userAgent: navigator.userAgent
+          })
+        }).catch(err => console.log('Could not notify backend:', err));
+      } catch (error) {
+        console.log('Iframe loaded notification failed:', error);
+      }
     });
   </script>
 </body>
