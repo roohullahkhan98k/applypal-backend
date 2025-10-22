@@ -1,0 +1,107 @@
+import { 
+  Controller, 
+  Post, 
+  Get, 
+  Body, 
+  Param, 
+  Res,
+  UseGuards,
+  ValidationPipe 
+} from '@nestjs/common';
+import { 
+  ApiTags, 
+  ApiOperation, 
+  ApiResponse, 
+  ApiBearerAuth 
+} from '@nestjs/swagger';
+import { Response } from 'express';
+import { UniversityService } from './university.service';
+import { WidgetConfigDto, WidgetResponseDto } from './dto/widget-config.dto';
+import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard';
+import { Public } from '../../common/decorators/public.decorator';
+
+@ApiTags('University')
+@Controller('university')
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
+export class UniversityController {
+  constructor(private universityService: UniversityService) {}
+
+  @Post('widget/generate')
+  @ApiOperation({ summary: 'Generate iframe widget from configuration' })
+  @ApiResponse({
+    status: 201,
+    description: 'Widget generated successfully',
+    type: WidgetResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid configuration data',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+  })
+  async generateWidget(
+    @Body(new ValidationPipe({ 
+      whitelist: false,
+      forbidNonWhitelisted: false,
+      transform: true 
+    })) config: WidgetConfigDto,
+  ): Promise<WidgetResponseDto> {
+    return this.universityService.generateWidget(config);
+  }
+
+  @Get('widget/:widgetId')
+  @Public()
+  @ApiOperation({ summary: 'Get widget HTML for iframe embedding (Public Access)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Widget HTML served successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Widget not found',
+  })
+  async getWidget(
+    @Param('widgetId') widgetId: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const config = await this.universityService.getWidgetConfig(widgetId);
+    
+    if (!config) {
+      res.status(404).send('Widget not found');
+      return;
+    }
+
+    const html = this.universityService.generateWidgetHTML(config);
+    
+    res.setHeader('Content-Type', 'text/html');
+    res.setHeader('X-Frame-Options', 'ALLOWALL');
+    res.setHeader('Content-Security-Policy', "frame-ancestors *");
+    res.send(html);
+  }
+
+  @Get('widget/:widgetId/config')
+  @ApiOperation({ summary: 'Get widget configuration' })
+  @ApiResponse({
+    status: 200,
+    description: 'Widget configuration retrieved successfully',
+    type: WidgetConfigDto,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Widget not found',
+  })
+  async getWidgetConfig(
+    @Param('widgetId') widgetId: string,
+  ): Promise<WidgetConfigDto> {
+    const config = await this.universityService.getWidgetConfig(widgetId);
+    
+    if (!config) {
+      throw new Error('Widget not found');
+    }
+    
+    return config;
+  }
+}
