@@ -6,7 +6,8 @@ import {
   Param, 
   Res,
   UseGuards,
-  ValidationPipe 
+  ValidationPipe,
+  Request
 } from '@nestjs/common';
 import { 
   ApiTags, 
@@ -48,8 +49,26 @@ export class UniversityController {
       forbidNonWhitelisted: false,
       transform: true 
     })) config: WidgetConfigDto,
+    @Request() req: any,
   ): Promise<WidgetResponseDto> {
-    return this.universityService.generateWidget(config);
+    const userId = req.user?.id; // Get user ID from JWT token
+    return this.universityService.generateWidget(config, userId);
+  }
+
+  @Get('widget/my-widget')
+  @ApiOperation({ summary: 'Get current user\'s existing widget' })
+  @ApiResponse({
+    status: 200,
+    description: 'User widget retrieved successfully',
+    type: WidgetResponseDto,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'No widget found for user',
+  })
+  async getMyWidget(@Request() req: any): Promise<WidgetResponseDto | null> {
+    const userId = req.user?.id;
+    return this.universityService.getUserWidget(userId);
   }
 
   @Get('widget/:widgetId')

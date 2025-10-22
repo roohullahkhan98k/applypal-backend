@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { WidgetConfigDto, WidgetResponseDto } from './dto/widget-config.dto';
 import { v4 as uuidv4 } from 'uuid';
+import { PrismaService } from '../../database/prisma.service';
 
 @Injectable()
 export class UniversityService {
@@ -8,11 +9,56 @@ export class UniversityService {
   private widgetStore = new Map<string, WidgetConfigDto>();
   private iframeLoads = new Map<string, { domain: string; timestamp: string; userAgent: string }[]>();
 
-  async generateWidget(config: WidgetConfigDto): Promise<WidgetResponseDto> {
-    const widgetId = uuidv4();
+  constructor(private prisma: PrismaService) {}
+
+  async generateWidget(config: WidgetConfigDto, userId?: string): Promise<WidgetResponseDto> {
+    let widgetId: string;
+    let isNewWidget = false;
+
+    // Check if user already has a widget
+    if (userId) {
+      const existingProfile = await this.prisma.universityProfile.findUnique({
+        where: { userId }
+      });
+
+      if (existingProfile?.widgetId) {
+        // User already has a widget, return existing one
+        widgetId = existingProfile.widgetId;
+        this.logger.log(`Returning existing widget ${widgetId} for user ${userId}`);
+      } else {
+        // Create new widget for user
+        widgetId = uuidv4();
+        isNewWidget = true;
+        this.logger.log(`Creating new widget ${widgetId} for user ${userId}`);
+      }
+    } else {
+      // No user context, create temporary widget
+      widgetId = uuidv4();
+      isNewWidget = true;
+      this.logger.log(`Creating temporary widget ${widgetId}`);
+    }
     
-    // Store widget configuration
+    // Store widget configuration in memory (for backward compatibility)
     this.widgetStore.set(widgetId, config);
+    
+    // If new widget and user context, save to database
+    if (isNewWidget && userId) {
+      await this.prisma.universityProfile.upsert({
+        where: { userId },
+        update: {
+          widgetId,
+          widgetConfig: config as any,
+          isVerified: false,
+          updatedAt: new Date()
+        },
+        create: {
+          userId,
+          widgetId,
+          widgetConfig: config as any,
+          isVerified: false
+        }
+      });
+    }
     
     // Generate iframe codes for different formats
     const iframeFormats = this.generateIframeFormats(widgetId);
@@ -30,6 +76,38 @@ export class UniversityService {
 
   async getWidgetConfig(widgetId: string): Promise<WidgetConfigDto | null> {
     return this.widgetStore.get(widgetId) || null;
+  }
+
+  async getUserWidget(userId: string): Promise<WidgetResponseDto | null> {
+    try {
+      const profile = await this.prisma.universityProfile.findUnique({
+        where: { userId },
+        include: { user: true }
+      });
+
+      if (!profile?.widgetId) {
+        return null;
+      }
+
+      // Restore widget config to memory if it exists in database
+      if (profile.widgetConfig) {
+        this.widgetStore.set(profile.widgetId, profile.widgetConfig as WidgetConfigDto);
+      }
+
+      // Generate iframe codes
+      const iframeFormats = this.generateIframeFormats(profile.widgetId);
+      const previewUrl = `${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/${profile.widgetId}`;
+
+      return {
+        iframeCode: iframeFormats.html,
+        iframeFormats,
+        previewUrl,
+        widgetId: profile.widgetId,
+      };
+    } catch (error) {
+      this.logger.error(`Error getting user widget for ${userId}:`, error);
+      return null;
+    }
   }
 
   async handleIframeLoaded(data: {
@@ -61,6 +139,20 @@ export class UniversityService {
       this.logger.log(`🌐 User Agent: ${userAgent.substring(0, 100)}...`);
       this.logger.log(`📊 Total loads for this widget: ${loads.length}`);
       this.logger.log(`✅ Integration Status: ACTIVE`);
+
+      // Mark widget as verified in database
+      try {
+        await this.prisma.universityProfile.updateMany({
+          where: { widgetId },
+          data: {
+            isVerified: true,
+            updatedAt: new Date()
+          }
+        });
+        this.logger.log(`📊 Widget ${widgetId} marked as verified in database`);
+      } catch (dbError) {
+        this.logger.warn(`Failed to update widget verification in database: ${dbError.message}`);
+      }
       
       return {
         success: true,

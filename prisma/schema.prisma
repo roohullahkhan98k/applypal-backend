@@ -18,6 +18,7 @@ model User {
   createdAt         DateTime           @default(now()) @map("created_at")
   updatedAt         DateTime           @updatedAt @map("updated_at")
   ambassadorProfile AmbassadorProfile?
+  universityProfile UniversityProfile?
 
   @@map("users")
 }
@@ -62,6 +63,19 @@ model AmbassadorProfile {
   socialLinks                SocialLinks?
 
   @@map("ambassador_profiles")
+}
+
+model UniversityProfile {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  widgetId          String?  @unique @map("widget_id")
+  isVerified        Boolean  @default(false) @map("is_verified")
+  widgetConfig      Json?    @map("widget_config")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("university_profiles")
 }
 
 model SocialLinks {
