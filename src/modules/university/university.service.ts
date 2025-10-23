@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { WidgetConfigDto, WidgetResponseDto } from './dto/widget-config.dto';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../../database/prisma.service';
+import { ChatClickService } from './services/chat-click.service';
 
 @Injectable()
 export class UniversityService {
@@ -9,7 +10,10 @@ export class UniversityService {
   private widgetStore = new Map<string, WidgetConfigDto>();
   private iframeLoads = new Map<string, { domain: string; timestamp: string; userAgent: string }[]>();
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private chatClickService: ChatClickService
+  ) {}
 
   async generateWidget(config: WidgetConfigDto, userId?: string): Promise<WidgetResponseDto> {
     let widgetId: string;
@@ -226,6 +230,79 @@ export class UniversityService {
         details: { error: error.message }
       };
     }
+  }
+
+  /**
+   * Record a chat icon click with full tracking data
+   */
+  async recordChatClick(clickData: any, ipAddress: string): Promise<{ success: boolean; message: string; clickId?: string }> {
+    return this.chatClickService.recordChatClick(clickData, ipAddress);
+  }
+
+  /**
+   * Get analytics data for a specific widget (only for verified widgets owned by user)
+   */
+  async getChatClickAnalytics(widgetId: string, userId?: string): Promise<any> {
+    // Verify that the widget exists and belongs to the user
+    if (userId) {
+      const profile = await this.prisma.universityProfile.findFirst({
+        where: { 
+          widgetId,
+          userId,
+          isVerified: true
+        }
+      });
+      
+      if (!profile) {
+        throw new Error('Widget not found or not verified');
+      }
+    }
+    
+    return this.chatClickService.getChatClickAnalytics(widgetId);
+  }
+
+  /**
+   * Get simple click count for a widget (only for verified widgets owned by user)
+   */
+  async getChatClickCount(widgetId: string, userId?: string): Promise<number> {
+    // Verify that the widget exists and belongs to the user
+    if (userId) {
+      const profile = await this.prisma.universityProfile.findFirst({
+        where: { 
+          widgetId,
+          userId,
+          isVerified: true
+        }
+      });
+      
+      if (!profile) {
+        throw new Error('Widget not found or not verified');
+      }
+    }
+    
+    return this.chatClickService.getClickCount(widgetId);
+  }
+
+  /**
+   * Get clicks by country for a widget (only for verified widgets owned by user)
+   */
+  async getChatClicksByCountry(widgetId: string, userId?: string): Promise<{ country: string; count: number }[]> {
+    // Verify that the widget exists and belongs to the user
+    if (userId) {
+      const profile = await this.prisma.universityProfile.findFirst({
+        where: { 
+          widgetId,
+          userId,
+          isVerified: true
+        }
+      });
+      
+      if (!profile) {
+        throw new Error('Widget not found or not verified');
+      }
+    }
+    
+    return this.chatClickService.getClicksByCountry(widgetId);
   }
 
   async getIntegrationStatus(widgetId: string): Promise<{
@@ -458,8 +535,8 @@ export class UniversityService {
 
     // Build icon HTML
     const iconsHTML = railIcons.map(({ name, icon, label, url }) => `
-      <div class="widget-icon" data-tooltip="${label}">
-        <a href="${url}" target="_blank" rel="noopener noreferrer">
+      <div class="widget-icon" data-tooltip="${label}" data-icon-name="${name}">
+        <a href="${url}" target="_blank" rel="noopener noreferrer" data-icon-name="${name}">
           ${icon}
         </a>
       </div>
@@ -587,7 +664,7 @@ export class UniversityService {
   </div>
   
   <script>
-    // Add tooltip functionality and dynamic width adjustment
+    // Add tooltip functionality and chat click tracking
     document.addEventListener('DOMContentLoaded', function() {
       const icons = document.querySelectorAll('.widget-icon');
       let maxTooltipWidth = 0;
@@ -608,6 +685,36 @@ export class UniversityService {
           tooltip.style.visibility = 'hidden';
           tooltip.style.opacity = '0';
         });
+
+        // Track chat icon clicks
+        const iconName = icon.getAttribute('data-icon-name');
+        const iconLink = icon.querySelector('a');
+        
+        if (iconName === 'Chat' && iconLink) {
+          iconLink.addEventListener('click', function(e) {
+            // Track the chat icon click
+            try {
+              fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/chat-click', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  widgetId: '${widgetId}',
+                  domain: document.referrer || window.location.hostname,
+                  timestamp: new Date().toISOString(),
+                  userAgent: navigator.userAgent
+                })
+              }).then(response => response.json())
+                .then(data => {
+                  console.log('💬 Chat click tracked:', data);
+                })
+                .catch(err => console.log('Could not track chat click:', err));
+            } catch (error) {
+              console.log('Chat click tracking failed:', error);
+            }
+          });
+        }
       });
       
       // Notify backend that iframe is loaded

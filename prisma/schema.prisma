@@ -105,6 +105,22 @@ model Following {
   @@map("following")
 }
 
+model ChatClick {
+  id          String   @id @default(uuid())
+  widgetId    String   @map("widget_id")
+  domain      String
+  ipAddress   String   @map("ip_address")
+  country     String?
+  clickedAt   DateTime @default(now()) @map("clicked_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("chat_clicks")
+  @@index([widgetId])
+  @@index([domain])
+  @@index([country])
+  @@index([clickedAt])
+}
+
 enum UserRole {
   ambassador
   university

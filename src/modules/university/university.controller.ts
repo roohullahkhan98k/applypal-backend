@@ -7,7 +7,8 @@ import {
   Res,
   UseGuards,
   ValidationPipe,
-  Request
+  Request,
+  Req
 } from '@nestjs/common';
 import { 
   ApiTags, 
@@ -18,6 +19,7 @@ import {
 import { Response } from 'express';
 import { UniversityService } from './university.service';
 import { WidgetConfigDto, WidgetResponseDto } from './dto/widget-config.dto';
+import { ChatClickDto, ChatClickResponseDto, ChatClickAnalyticsDto } from './dto/chat-click.dto';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
 
@@ -177,5 +179,86 @@ export class UniversityController {
     statistics?: any;
   }> {
     return this.universityService.getIntegrationStatus(widgetId);
+  }
+
+  @Post('widget/chat-click')
+  @Public()
+  @ApiOperation({ summary: 'Record chat icon click (Public Access)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Chat click recorded successfully',
+    type: ChatClickResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid click data',
+  })
+  async handleChatClick(
+    @Body(new ValidationPipe({ 
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true 
+    })) data: ChatClickDto,
+    @Req() req: any,
+  ): Promise<ChatClickResponseDto> {
+    // Extract IP address from request
+    const ipAddress = req.ip || 
+                     req.connection?.remoteAddress || 
+                     req.socket?.remoteAddress ||
+                     (req.connection?.socket ? req.connection.socket.remoteAddress : null) ||
+                     req.headers['x-forwarded-for'] ||
+                     req.headers['x-real-ip'] ||
+                     'unknown';
+    
+    return this.universityService.recordChatClick(data, ipAddress);
+  }
+
+  @Get('widget/:widgetId/chat-analytics')
+  @ApiOperation({ summary: 'Get chat click analytics for verified widget (Authenticated Access)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Chat click analytics retrieved successfully',
+    type: ChatClickAnalyticsDto,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Widget not found or not verified',
+  })
+  async getChatClickAnalytics(
+    @Param('widgetId') widgetId: string,
+    @Request() req: any,
+  ): Promise<ChatClickAnalyticsDto> {
+    // Only allow access to analytics for widgets owned by the authenticated user
+    const userId = req.user?.id;
+    return this.universityService.getChatClickAnalytics(widgetId, userId);
+  }
+
+  @Get('widget/:widgetId/chat-count')
+  @ApiOperation({ summary: 'Get total chat click count for verified widget (Authenticated Access)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Chat click count retrieved successfully',
+  })
+  async getChatClickCount(
+    @Param('widgetId') widgetId: string,
+    @Request() req: any,
+  ): Promise<{ count: number }> {
+    const userId = req.user?.id;
+    const count = await this.universityService.getChatClickCount(widgetId, userId);
+    return { count };
+  }
+
+  @Get('widget/:widgetId/chat-countries')
+  @ApiOperation({ summary: 'Get chat clicks grouped by country for verified widget (Authenticated Access)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Chat clicks by country retrieved successfully',
+  })
+  async getChatClicksByCountry(
+    @Param('widgetId') widgetId: string,
+    @Request() req: any,
+  ): Promise<{ country: string; count: number }[]> {
+    const userId = req.user?.id;
+    return this.universityService.getChatClicksByCountry(widgetId, userId);
   }
 }
