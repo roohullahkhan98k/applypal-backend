@@ -20,7 +20,7 @@ import { Response } from 'express';
 import { UniversityService } from './university.service';
 import { WidgetConfigDto, WidgetResponseDto } from './dto/widget-config.dto';
 import { ChatClickDto, ChatClickResponseDto, ChatClickAnalyticsDto } from './dto/chat-click.dto';
-import { SetUniversityEmailDto, SendInvitationDto, EmailResponseDto, InvitationResponseDto } from './dto/email.dto';
+import { SetUniversityEmailDto, SendInvitationDto, EmailResponseDto, InvitationResponseDto, BulkInvitationDto, BulkInvitationResponseDto } from './dto/email.dto';
 import { InvitedAmbassadorDto, InvitationListResponseDto, UpdateInvitationStatusDto } from './dto/invitation.dto';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
@@ -315,6 +315,25 @@ export class UniversityController {
   ): Promise<InvitationResponseDto> {
     const userId = req.user?.id;
     return this.universityService.sendAmbassadorInvitation(userId, invitationData);
+  }
+
+  @Post('email/send-bulk-invitations')
+  @ApiOperation({ summary: 'Send bulk ambassador invitations' })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk invitations sent successfully',
+    type: BulkInvitationResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'University email not set or invalid invitation data',
+  })
+  async sendBulkAmbassadorInvitations(
+    @Body(ValidationPipe) bulkData: BulkInvitationDto,
+    @Request() req: any,
+  ): Promise<BulkInvitationResponseDto> {
+    const userId = req.user?.id;
+    return this.universityService.sendBulkAmbassadorInvitations(userId, bulkData);
   }
 
   // ==================== INVITATION MANAGEMENT ENDPOINTS ====================

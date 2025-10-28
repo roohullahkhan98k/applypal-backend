@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../../database/prisma.service';
 import { ChatClickService } from './services/chat-click.service';
 import { EmailService } from './services/email.service';
-import { SetUniversityEmailDto, SendInvitationDto, EmailResponseDto, InvitationResponseDto } from './dto/email.dto';
+import { SetUniversityEmailDto, SendInvitationDto, EmailResponseDto, InvitationResponseDto, BulkInvitationDto, BulkInvitationResponseDto } from './dto/email.dto';
 import { InvitedAmbassadorDto, InvitationListResponseDto, UpdateInvitationStatusDto } from './dto/invitation.dto';
 
 @Injectable()
@@ -968,6 +968,138 @@ export class UniversityService {
       return {
         success: false,
         message: `Failed to update status: ${error.message}`
+      };
+    }
+  }
+
+  /**
+   * Send bulk ambassador invitations
+   */
+  async sendBulkAmbassadorInvitations(userId: string, bulkData: BulkInvitationDto): Promise<BulkInvitationResponseDto> {
+    try {
+      // Get university profile with email and user name
+      const universityProfile = await this.prisma.universityProfile.findUnique({
+        where: { userId },
+        select: { 
+          email: true, 
+          user: { 
+            select: { fullName: true } 
+          } 
+        }
+      });
+
+      if (!universityProfile?.email) {
+        return {
+          success: false,
+          message: 'University email not set. Please set your email address first.',
+          totalSent: 0,
+          totalFailed: bulkData.ambassadors.length,
+          results: bulkData.ambassadors.map(amb => ({
+            name: amb.name,
+            email: amb.email,
+            success: false,
+            error: 'University email not set'
+          }))
+        };
+      }
+
+      // Use provided university name or fallback to user name
+      const universityName = bulkData.universityName || universityProfile.user.fullName || 'University';
+
+      const results = [];
+      let totalSent = 0;
+      let totalFailed = 0;
+
+      // Process each ambassador invitation
+      for (const ambassador of bulkData.ambassadors) {
+        try {
+          // Validate email format
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(ambassador.email)) {
+            results.push({
+              name: ambassador.name,
+              email: ambassador.email,
+              success: false,
+              error: 'Invalid email format'
+            });
+            totalFailed++;
+            continue;
+          }
+
+          // Send invitation email
+          const emailResult = await this.emailService.sendAmbassadorInvitation(
+            {
+              ambassadorName: ambassador.name,
+              ambassadorEmail: ambassador.email,
+              universityName
+            },
+            universityProfile.email,
+            universityName
+          );
+
+          if (emailResult.success) {
+            // Create invitation record in database
+            await this.prisma.invitedAmbassador.create({
+              data: {
+                universityId: userId,
+                ambassadorName: ambassador.name,
+                ambassadorEmail: ambassador.email,
+                status: 'INVITED'
+              }
+            });
+
+            results.push({
+              name: ambassador.name,
+              email: ambassador.email,
+              success: true
+            });
+            totalSent++;
+
+            this.logger.log(`📧 Bulk invitation sent to ${ambassador.name} (${ambassador.email})`);
+          } else {
+            results.push({
+              name: ambassador.name,
+              email: ambassador.email,
+              success: false,
+              error: emailResult.message
+            });
+            totalFailed++;
+          }
+
+        } catch (error) {
+          results.push({
+            name: ambassador.name,
+            email: ambassador.email,
+            success: false,
+            error: `Failed to send: ${error.message}`
+          });
+          totalFailed++;
+        }
+      }
+
+      this.logger.log(`📊 Bulk invitations completed: ${totalSent} sent, ${totalFailed} failed`);
+
+      return {
+        success: totalSent > 0,
+        message: `Bulk invitations completed: ${totalSent} sent, ${totalFailed} failed`,
+        totalSent,
+        totalFailed,
+        results
+      };
+
+    } catch (error) {
+      this.logger.error(`❌ Failed to send bulk invitations: ${error.message}`);
+      return {
+        success: false,
+        message: `Failed to send bulk invitations: ${error.message}`,
+        totalSent: 0,
+        totalFailed: bulkData.ambassadors.length,
+        results: bulkData.ambassadors.map(amb => ({
+          name: amb.name,
+          email: amb.email,
+          success: false,
+          error: 'System error'
+        }))
       };
     }
   }

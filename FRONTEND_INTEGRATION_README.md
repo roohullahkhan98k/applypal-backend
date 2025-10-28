@@ -143,6 +143,70 @@ const sendInvitation = async (ambassadorData) => {
 
 ---
 
+### 4. Send Bulk Ambassador Invitations
+**Endpoint:** `POST /university/email/send-bulk-invitations`
+
+**Purpose:** Send invitation emails to multiple ambassadors at once
+
+**Request Body:**
+```json
+{
+  "ambassadors": [
+    { "name": "John Doe", "email": "john.doe@example.com" },
+    { "name": "Jane Smith", "email": "jane.smith@example.com" },
+    { "name": "Bob Johnson", "email": "bob.johnson@example.com" }
+  ],
+  "universityName": "Harvard University"  // Optional - defaults to user's name
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Bulk invitations completed: 3 sent, 0 failed",
+  "totalSent": 3,
+  "totalFailed": 0,
+  "results": [
+    { "name": "John Doe", "email": "john.doe@example.com", "success": true },
+    { "name": "Jane Smith", "email": "jane.smith@example.com", "success": true },
+    { "name": "Bob Johnson", "email": "bob.johnson@example.com", "success": true }
+  ]
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "Bulk invitations completed: 2 sent, 1 failed",
+  "totalSent": 2,
+  "totalFailed": 1,
+  "results": [
+    { "name": "John Doe", "email": "john.doe@example.com", "success": true },
+    { "name": "Jane Smith", "email": "jane.smith@example.com", "success": true },
+    { "name": "Bob Johnson", "email": "invalid-email", "success": false, "error": "Invalid email format" }
+  ]
+}
+```
+
+**Frontend Implementation:**
+```javascript
+const sendBulkInvitations = async (ambassadorsData) => {
+  const response = await fetch('/university/email/send-bulk-invitations', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(ambassadorsData)
+  });
+  return response.json();
+};
+```
+
+---
+
 ## 📋 Invitation Management APIs
 
 ### 4. Get Invited Ambassadors List
@@ -352,6 +416,144 @@ const InvitationForm = () => {
       </button>
       {message && <p>{message}</p>}
     </form>
+  );
+};
+```
+
+### 2b. Bulk Invitation Form
+```jsx
+// Component for sending bulk ambassador invitations
+const BulkInvitationForm = () => {
+  const [ambassadors, setAmbassadors] = useState([
+    { name: '', email: '' }
+  ]);
+  const [universityName, setUniversityName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [results, setResults] = useState(null);
+
+  const addAmbassador = () => {
+    setAmbassadors([...ambassadors, { name: '', email: '' }]);
+  };
+
+  const removeAmbassador = (index) => {
+    setAmbassadors(ambassadors.filter((_, i) => i !== index));
+  };
+
+  const updateAmbassador = (index, field, value) => {
+    const updated = [...ambassadors];
+    updated[index][field] = value;
+    setAmbassadors(updated);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage('');
+    setResults(null);
+    
+    try {
+      const result = await sendBulkInvitations({
+        ambassadors: ambassadors.filter(amb => amb.name && amb.email),
+        universityName: universityName || undefined
+      });
+      
+      setResults(result);
+      setMessage(`✅ ${result.message}`);
+      
+      if (result.totalSent > 0) {
+        // Clear form on success
+        setAmbassadors([{ name: '', email: '' }]);
+        setUniversityName('');
+      }
+    } catch (error) {
+      setMessage('❌ Failed to send bulk invitations');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <h3 className="text-lg font-semibold mb-4">Bulk Invite Ambassadors</h3>
+      
+      <form onSubmit={handleSubmit}>
+        {ambassadors.map((ambassador, index) => (
+          <div key={index} className="flex gap-2 mb-2">
+            <input
+              type="text"
+              value={ambassador.name}
+              onChange={(e) => updateAmbassador(index, 'name', e.target.value)}
+              placeholder="Ambassador Name"
+              className="flex-1"
+              required
+            />
+            <input
+              type="email"
+              value={ambassador.email}
+              onChange={(e) => updateAmbassador(index, 'email', e.target.value)}
+              placeholder="ambassador@example.com"
+              className="flex-1"
+              required
+            />
+            {ambassadors.length > 1 && (
+              <button
+                type="button"
+                onClick={() => removeAmbassador(index)}
+                className="px-3 py-1 bg-red-500 text-white rounded"
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        ))}
+        
+        <div className="flex gap-2 mb-4">
+          <button
+            type="button"
+            onClick={addAmbassador}
+            className="px-4 py-2 bg-blue-500 text-white rounded"
+          >
+            + Add Ambassador
+          </button>
+        </div>
+        
+        <input
+          type="text"
+          value={universityName}
+          onChange={(e) => setUniversityName(e.target.value)}
+          placeholder="University Name (Optional)"
+          className="w-full mb-4"
+        />
+        
+        <button type="submit" disabled={loading} className="w-full">
+          {loading ? 'Sending...' : `Send ${ambassadors.length} Invitations`}
+        </button>
+      </form>
+      
+      {message && (
+        <div className={`mt-4 p-3 rounded ${
+          message.includes('✅') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+        }`}>
+          {message}
+        </div>
+      )}
+      
+      {results && (
+        <div className="mt-4">
+          <h4 className="font-semibold mb-2">Results:</h4>
+          <div className="space-y-1">
+            {results.results.map((result, index) => (
+              <div key={index} className={`p-2 rounded text-sm ${
+                result.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
+              }`}>
+                {result.name} ({result.email}) - {result.success ? '✅ Sent' : `❌ ${result.error}`}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 ```

@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsEmail, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsEmail, IsOptional, IsArray, ValidateNested, IsObject } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class SetUniversityEmailDto {
   @ApiProperty({ 
@@ -77,4 +78,86 @@ export class InvitationResponseDto {
     example: 'ambassador@example.com'
   })
   sentTo: string;
+}
+
+export class AmbassadorDto {
+  @ApiProperty({ 
+    description: 'Ambassador name',
+    example: 'John Doe'
+  })
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ApiProperty({ 
+    description: 'Ambassador email',
+    example: 'john@example.com'
+  })
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+}
+
+export class BulkInvitationDto {
+  @ApiProperty({ 
+    description: 'List of ambassadors to invite',
+    example: [
+      { name: 'John Doe', email: 'john@example.com' },
+      { name: 'Jane Smith', email: 'jane@example.com' }
+    ],
+    type: [AmbassadorDto]
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AmbassadorDto)
+  ambassadors: AmbassadorDto[];
+
+  @ApiProperty({ 
+    description: 'University name (optional)',
+    example: 'Harvard University',
+    required: false
+  })
+  @IsOptional()
+  @IsString()
+  universityName?: string;
+}
+
+export class BulkInvitationResponseDto {
+  @ApiProperty({ 
+    description: 'Whether the bulk operation was successful',
+    example: true
+  })
+  success: boolean;
+
+  @ApiProperty({ 
+    description: 'Response message',
+    example: 'Bulk invitations sent successfully'
+  })
+  message: string;
+
+  @ApiProperty({ 
+    description: 'Total invitations sent',
+    example: 5
+  })
+  totalSent: number;
+
+  @ApiProperty({ 
+    description: 'Total invitations failed',
+    example: 1
+  })
+  totalFailed: number;
+
+  @ApiProperty({ 
+    description: 'Details of each invitation',
+    example: [
+      { name: 'John Doe', email: 'john@example.com', success: true },
+      { name: 'Jane Smith', email: 'jane@example.com', success: false, error: 'Invalid email' }
+    ]
+  })
+  results: {
+    name: string;
+    email: string;
+    success: boolean;
+    error?: string;
+  }[];
 }
