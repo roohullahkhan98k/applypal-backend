@@ -3,6 +3,9 @@ import { WidgetConfigDto, WidgetResponseDto } from './dto/widget-config.dto';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../../database/prisma.service';
 import { ChatClickService } from './services/chat-click.service';
+import { EmailService } from './services/email.service';
+import { SetUniversityEmailDto, SendInvitationDto, EmailResponseDto, InvitationResponseDto } from './dto/email.dto';
+import { InvitedAmbassadorDto, InvitationListResponseDto, UpdateInvitationStatusDto } from './dto/invitation.dto';
 
 @Injectable()
 export class UniversityService {
@@ -12,7 +15,8 @@ export class UniversityService {
 
   constructor(
     private prisma: PrismaService,
-    private chatClickService: ChatClickService
+    private chatClickService: ChatClickService,
+    private emailService: EmailService
   ) {}
 
   async generateWidget(config: WidgetConfigDto, userId?: string): Promise<WidgetResponseDto> {
@@ -735,8 +739,236 @@ export class UniversityService {
         console.log('Iframe loaded notification failed:', error);
       }
     });
-  </script>
-</body>
+    </script>
+  </body>
 </html>`;
+  }
+
+  /**
+   * Set university email address
+   */
+  async setUniversityEmail(userId: string, emailData: SetUniversityEmailDto): Promise<EmailResponseDto> {
+    try {
+      // Check if email is already taken by another university
+      const existingEmail = await this.prisma.universityProfile.findFirst({
+        where: {
+          email: emailData.email,
+          userId: { not: userId }
+        }
+      });
+
+      if (existingEmail) {
+        return {
+          success: false,
+          message: 'This email is already registered to another university'
+        };
+      }
+
+      // Update or create university profile with email
+      const universityProfile = await this.prisma.universityProfile.upsert({
+        where: { userId },
+        update: {
+          email: emailData.email,
+          updatedAt: new Date()
+        },
+        create: {
+          userId,
+          email: emailData.email
+        }
+      });
+
+      this.logger.log(`📧 University email set: ${emailData.email} for user ${userId}`);
+
+      return {
+        success: true,
+        message: 'University email set successfully',
+        email: emailData.email
+      };
+
+    } catch (error) {
+      this.logger.error(`❌ Failed to set university email: ${error.message}`);
+      return {
+        success: false,
+        message: `Failed to set email: ${error.message}`
+      };
+    }
+  }
+
+  /**
+   * Get university email address
+   */
+  async getUniversityEmail(userId: string): Promise<{ email?: string; hasEmail: boolean }> {
+    try {
+      const universityProfile = await this.prisma.universityProfile.findUnique({
+        where: { userId },
+        select: { email: true }
+      });
+
+      return {
+        email: universityProfile?.email || undefined,
+        hasEmail: !!universityProfile?.email
+      };
+
+    } catch (error) {
+      this.logger.error(`❌ Failed to get university email: ${error.message}`);
+      return { hasEmail: false };
+    }
+  }
+
+  /**
+   * Send ambassador invitation
+   */
+  async sendAmbassadorInvitation(userId: string, invitationData: SendInvitationDto): Promise<InvitationResponseDto> {
+    try {
+      // Get university profile with email and user name
+      const universityProfile = await this.prisma.universityProfile.findUnique({
+        where: { userId },
+        select: { 
+          email: true, 
+          user: { 
+            select: { fullName: true } 
+          } 
+        }
+      });
+
+      if (!universityProfile?.email) {
+        return {
+          success: false,
+          message: 'University email not set. Please set your email address first.',
+          sentTo: invitationData.ambassadorEmail
+        };
+      }
+
+      // Use provided university name or fallback to user name
+      const universityName = invitationData.universityName || universityProfile.user.fullName || 'University';
+
+      // Send invitation email
+      const result = await this.emailService.sendAmbassadorInvitation(
+        invitationData,
+        universityProfile.email,
+        universityName
+      );
+
+      if (result.success) {
+        // Create invitation record in database
+        await this.prisma.invitedAmbassador.create({
+          data: {
+            universityId: userId,
+            ambassadorName: invitationData.ambassadorName,
+            ambassadorEmail: invitationData.ambassadorEmail,
+            status: 'INVITED'
+          }
+        });
+
+        this.logger.log(`📧 Invitation sent from ${universityName} (${universityProfile.email}) to ${invitationData.ambassadorEmail}`);
+        this.logger.log(`📝 Invitation record created in database`);
+      }
+
+      return {
+        success: result.success,
+        message: result.message,
+        sentTo: invitationData.ambassadorEmail
+      };
+
+    } catch (error) {
+      this.logger.error(`❌ Failed to send ambassador invitation: ${error.message}`);
+      return {
+        success: false,
+        message: `Failed to send invitation: ${error.message}`,
+        sentTo: invitationData.ambassadorEmail
+      };
+    }
+  }
+
+  /**
+   * Get all invited ambassadors for a university
+   */
+  async getInvitedAmbassadors(userId: string): Promise<InvitationListResponseDto> {
+    try {
+      const invitations = await this.prisma.invitedAmbassador.findMany({
+        where: { universityId: userId },
+        orderBy: { invitedAt: 'desc' },
+        select: {
+          id: true,
+          ambassadorName: true,
+          ambassadorEmail: true,
+          status: true,
+          invitedAt: true,
+          respondedAt: true
+        }
+      });
+
+      // Count by status
+      const statusCounts = invitations.reduce((acc, invitation) => {
+        acc[invitation.status]++;
+        return acc;
+      }, { INVITED: 0, ACCEPTED: 0, DECLINED: 0 });
+
+      this.logger.log(`📊 Retrieved ${invitations.length} invitations for university ${userId}`);
+
+      return {
+        invitations: invitations.map(invitation => ({
+          id: invitation.id,
+          ambassadorName: invitation.ambassadorName,
+          ambassadorEmail: invitation.ambassadorEmail,
+          status: invitation.status as 'INVITED' | 'ACCEPTED' | 'DECLINED',
+          invitedAt: invitation.invitedAt.toISOString(),
+          respondedAt: invitation.respondedAt?.toISOString()
+        })),
+        totalCount: invitations.length,
+        statusCounts
+      };
+
+    } catch (error) {
+      this.logger.error(`❌ Failed to get invited ambassadors: ${error.message}`);
+      return {
+        invitations: [],
+        totalCount: 0,
+        statusCounts: { INVITED: 0, ACCEPTED: 0, DECLINED: 0 }
+      };
+    }
+  }
+
+  /**
+   * Update invitation status (for frontend decline/accept handling)
+   */
+  async updateInvitationStatus(
+    ambassadorEmail: string, 
+    status: 'ACCEPTED' | 'DECLINED'
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      const invitation = await this.prisma.invitedAmbassador.findFirst({
+        where: { ambassadorEmail }
+      });
+
+      if (!invitation) {
+        return {
+          success: false,
+          message: 'Invitation not found'
+        };
+      }
+
+      await this.prisma.invitedAmbassador.update({
+        where: { id: invitation.id },
+        data: {
+          status,
+          respondedAt: new Date()
+        }
+      });
+
+      this.logger.log(`📝 Invitation status updated to ${status} for ${ambassadorEmail}`);
+
+      return {
+        success: true,
+        message: `Invitation ${status.toLowerCase()} successfully`
+      };
+
+    } catch (error) {
+      this.logger.error(`❌ Failed to update invitation status: ${error.message}`);
+      return {
+        success: false,
+        message: `Failed to update status: ${error.message}`
+      };
+    }
   }
 }

@@ -20,6 +20,8 @@ import { Response } from 'express';
 import { UniversityService } from './university.service';
 import { WidgetConfigDto, WidgetResponseDto } from './dto/widget-config.dto';
 import { ChatClickDto, ChatClickResponseDto, ChatClickAnalyticsDto } from './dto/chat-click.dto';
+import { SetUniversityEmailDto, SendInvitationDto, EmailResponseDto, InvitationResponseDto } from './dto/email.dto';
+import { InvitedAmbassadorDto, InvitationListResponseDto, UpdateInvitationStatusDto } from './dto/invitation.dto';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
 
@@ -260,5 +262,104 @@ export class UniversityController {
   ): Promise<{ country: string; count: number }[]> {
     const userId = req.user?.id;
     return this.universityService.getChatClicksByCountry(widgetId, userId);
+  }
+
+  // ==================== EMAIL MANAGEMENT ENDPOINTS ====================
+
+  @Post('email/set')
+  @ApiOperation({ summary: 'Set university email address for sending invitations' })
+  @ApiResponse({
+    status: 200,
+    description: 'University email set successfully',
+    type: EmailResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid email or email already taken',
+  })
+  async setUniversityEmail(
+    @Body(ValidationPipe) emailData: SetUniversityEmailDto,
+    @Request() req: any,
+  ): Promise<EmailResponseDto> {
+    const userId = req.user?.id;
+    return this.universityService.setUniversityEmail(userId, emailData);
+  }
+
+  @Get('email')
+  @ApiOperation({ summary: 'Get university email address' })
+  @ApiResponse({
+    status: 200,
+    description: 'University email retrieved successfully',
+  })
+  async getUniversityEmail(
+    @Request() req: any,
+  ): Promise<{ email?: string; hasEmail: boolean }> {
+    const userId = req.user?.id;
+    return this.universityService.getUniversityEmail(userId);
+  }
+
+  @Post('email/send-invitation')
+  @ApiOperation({ summary: 'Send ambassador invitation email' })
+  @ApiResponse({
+    status: 200,
+    description: 'Ambassador invitation sent successfully',
+    type: InvitationResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'University email not set or invalid invitation data',
+  })
+  async sendAmbassadorInvitation(
+    @Body(ValidationPipe) invitationData: SendInvitationDto,
+    @Request() req: any,
+  ): Promise<InvitationResponseDto> {
+    const userId = req.user?.id;
+    return this.universityService.sendAmbassadorInvitation(userId, invitationData);
+  }
+
+  // ==================== INVITATION MANAGEMENT ENDPOINTS ====================
+
+  @Get('invitations')
+  @ApiOperation({ summary: 'Get all invited ambassadors for university' })
+  @ApiResponse({
+    status: 200,
+    description: 'Invited ambassadors retrieved successfully',
+    type: InvitationListResponseDto,
+  })
+  async getInvitedAmbassadors(
+    @Request() req: any,
+  ): Promise<InvitationListResponseDto> {
+    const userId = req.user?.id;
+    return this.universityService.getInvitedAmbassadors(userId);
+  }
+
+  @Post('invitations/:ambassadorEmail/status')
+  @ApiOperation({ summary: 'Update invitation status (Accept/Decline)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Invitation status updated successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Invitation not found',
+  })
+  async updateInvitationStatus(
+    @Param('ambassadorEmail') ambassadorEmail: string,
+    @Body(ValidationPipe) statusData: UpdateInvitationStatusDto,
+  ): Promise<{ success: boolean; message: string }> {
+    return this.universityService.updateInvitationStatus(ambassadorEmail, statusData.status);
+  }
+
+  @Get('invitations/decline')
+  @Public()
+  @ApiOperation({ summary: 'Handle invitation decline (Public Access)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Invitation declined successfully',
+  })
+  async declineInvitation(
+    @Param('token') token: string,
+  ): Promise<{ success: boolean; message: string }> {
+    return this.universityService.updateInvitationStatus(token, 'DECLINED');
   }
 }

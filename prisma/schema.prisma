@@ -71,11 +71,32 @@ model UniversityProfile {
   widgetId          String?  @unique @map("widget_id")
   isVerified        Boolean  @default(false) @map("is_verified")
   widgetConfig      Json?    @map("widget_config")
+  email             String?  @unique
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invitedAmbassadors InvitedAmbassador[]
 
   @@map("university_profiles")
+}
+
+model InvitedAmbassador {
+  id                String   @id @default(uuid())
+  universityId      String   @map("university_id")
+  ambassadorName    String   @map("ambassador_name")
+  ambassadorEmail   String   @map("ambassador_email")
+  status            InvitationStatus @default(INVITED)
+  invitedAt         DateTime @default(now()) @map("invited_at")
+  respondedAt       DateTime? @map("responded_at")
+  university        UniversityProfile @relation(fields: [universityId], references: [userId], onDelete: Cascade)
+
+  @@map("invited_ambassadors")
+}
+
+enum InvitationStatus {
+  INVITED
+  ACCEPTED
+  DECLINED
 }
 
 model SocialLinks {
