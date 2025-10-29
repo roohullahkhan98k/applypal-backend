@@ -1,10 +1,12 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { UserPayload } from '../interfaces/user.interface';
 import { SignupDto } from '../dto/signup.dto';
 import { LoginDto } from '../dto/login.dto';
 import { AuthResponseDto } from '../dto/auth-response.dto';
+import { VerifyPasswordDto } from '../dto/verify-password.dto';
+import { ChangePasswordDto } from '../dto/change-password.dto';
 import { PrismaService } from '../../database/prisma.service';
 
 @Injectable()
@@ -121,6 +123,66 @@ export class AuthService {
       where: { id: payload.sub },
     });
     return user || null;
+  }
+
+  async verifyPassword(userId: string, verifyPasswordDto: VerifyPasswordDto): Promise<{ isValid: boolean }> {
+    const { currentPassword } = verifyPasswordDto;
+
+    // Get user from database
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // Verify current password
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    
+    return { isValid: isPasswordValid };
+  }
+
+  async changePassword(userId: string, changePasswordDto: ChangePasswordDto): Promise<{ message: string }> {
+    const { currentPassword, newPassword, confirmPassword } = changePasswordDto;
+
+    // Check if new password and confirm password match
+    if (newPassword !== confirmPassword) {
+      throw new BadRequestException('New password and confirm password do not match');
+    }
+
+    // Check if new password is different from current password
+    if (currentPassword === newPassword) {
+      throw new BadRequestException('New password must be different from current password');
+    }
+
+    // Get user from database
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // Verify current password
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isCurrentPasswordValid) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    // Hash new password
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password in database
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash: hashedNewPassword,
+      },
+    });
+
+    return { message: 'Password changed successfully' };
   }
 
 }
