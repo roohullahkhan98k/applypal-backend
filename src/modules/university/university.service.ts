@@ -573,8 +573,8 @@ export class UniversityService {
       width: 44px;
       height: ${dynamicHeight}px;
       border-radius: 720px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid ${selectedColor};
+      background: #FFFFFF1A;
+      border: 0.6px solid #FFFFFF;
       backdrop-filter: blur(35px);
       -webkit-backdrop-filter: blur(35px);
       display: flex;
@@ -609,7 +609,7 @@ export class UniversityService {
     }
     
     .widget-icon:hover {
-      background: #439EFF;
+      background: ${selectedColor};
     }
     
     .widget-icon a {
@@ -619,7 +619,7 @@ export class UniversityService {
       width: 100%;
       height: 100%;
       text-decoration: none;
-      color: ${selectedColor};
+      color: #FFFFFF;
     }
     
     .widget-icon svg {
@@ -636,11 +636,11 @@ export class UniversityService {
       min-width: 101px;
       border-radius: 21px;
       padding: 4px 10px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid ${selectedColor};
+      background: #FFFFFF1A;
+      border: 0.6px solid #FFFFFF;
       backdrop-filter: blur(35px);
       -webkit-backdrop-filter: blur(35px);
-      color: ${selectedColor};
+      color: #FFFFFF;
       font-size: 12px;
       display: flex;
       align-items: center;
@@ -902,7 +902,7 @@ export class UniversityService {
       const statusCounts = invitations.reduce((acc, invitation) => {
         acc[invitation.status]++;
         return acc;
-      }, { INVITED: 0, ACCEPTED: 0, DECLINED: 0 });
+      }, { INVITED: 0, ACCEPTED: 0, DECLINED: 0, JOINED: 0 });
 
       this.logger.log(`📊 Retrieved ${invitations.length} invitations for university ${userId}`);
 
@@ -911,7 +911,7 @@ export class UniversityService {
           id: invitation.id,
           ambassadorName: invitation.ambassadorName,
           ambassadorEmail: invitation.ambassadorEmail,
-          status: invitation.status as 'INVITED' | 'ACCEPTED' | 'DECLINED',
+          status: invitation.status as 'INVITED' | 'ACCEPTED' | 'DECLINED' | 'JOINED',
           invitedAt: invitation.invitedAt.toISOString(),
           respondedAt: invitation.respondedAt?.toISOString()
         })),
@@ -924,7 +924,7 @@ export class UniversityService {
       return {
         invitations: [],
         totalCount: 0,
-        statusCounts: { INVITED: 0, ACCEPTED: 0, DECLINED: 0 }
+        statusCounts: { INVITED: 0, ACCEPTED: 0, DECLINED: 0, JOINED: 0 }
       };
     }
   }
@@ -1101,6 +1101,40 @@ export class UniversityService {
           error: 'System error'
         }))
       };
+    }
+  }
+
+  /**
+   * Check if an email was invited and get invitation status
+   */
+  async checkInvitationStatus(email: string): Promise<{ wasInvited: boolean; status?: string; universityName?: string }> {
+    try {
+      const invitation = await this.prisma.invitedAmbassador.findFirst({
+        where: { ambassadorEmail: email },
+        include: {
+          university: {
+            include: {
+              user: {
+                select: { fullName: true }
+              }
+            }
+          }
+        }
+      });
+
+      if (!invitation) {
+        return { wasInvited: false };
+      }
+
+      return {
+        wasInvited: true,
+        status: invitation.status,
+        universityName: invitation.university.user.fullName
+      };
+
+    } catch (error) {
+      this.logger.error(`❌ Error checking invitation status for ${email}:`, error);
+      return { wasInvited: false };
     }
   }
 }

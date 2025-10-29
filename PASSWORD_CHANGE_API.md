@@ -3,10 +3,6 @@
 ## Overview
 Two-step password change API for both Ambassador and University users. The API requires JWT authentication and works for users with any role.
 
-## Base URL
-```
-http://localhost:3000
-```
 
 ## Authentication
 All endpoints require JWT authentication. Include the token in the Authorization header:

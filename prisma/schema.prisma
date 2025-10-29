@@ -97,6 +97,7 @@ enum InvitationStatus {
   INVITED
   ACCEPTED
   DECLINED
+  JOINED
 }
 
 model SocialLinks {

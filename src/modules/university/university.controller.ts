@@ -369,6 +369,19 @@ export class UniversityController {
     return this.universityService.updateInvitationStatus(ambassadorEmail, statusData.status);
   }
 
+  @Get('invitations/:token/accept')
+  @Public()
+  @ApiOperation({ summary: 'Handle invitation accept (Public Access)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Invitation accepted successfully',
+  })
+  async acceptInvitation(
+    @Param('token') token: string,
+  ): Promise<{ success: boolean; message: string }> {
+    return this.universityService.updateInvitationStatus(token, 'ACCEPTED');
+  }
+
   @Get('invitations/decline')
   @Public()
   @ApiOperation({ summary: 'Handle invitation decline (Public Access)' })
@@ -380,5 +393,18 @@ export class UniversityController {
     @Param('token') token: string,
   ): Promise<{ success: boolean; message: string }> {
     return this.universityService.updateInvitationStatus(token, 'DECLINED');
+  }
+
+  @Get('invitations/check/:email')
+  @Public()
+  @ApiOperation({ summary: 'Check if email was invited (Public Access)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Invitation status retrieved successfully',
+  })
+  async checkInvitationStatus(
+    @Param('email') email: string,
+  ): Promise<{ wasInvited: boolean; status?: string; universityName?: string }> {
+    return this.universityService.checkInvitationStatus(email);
   }
 }

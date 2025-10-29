@@ -229,7 +229,7 @@ export class EmailService {
             </div>
             
             <div class="cta-container">
-                <a href="${signupUrl}" class="cta-button" style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); margin-right: 10px;">
+                <a href="${process.env.FRONTEND_URL}/invitation/accept?token=${ambassadorEmail}" class="cta-button" style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); margin-right: 10px;">
                     ✅ Accept Invitation & Sign Up
                 </a>
                 <a href="${process.env.FRONTEND_URL}/invitation/decline?token=${ambassadorEmail}" class="cta-button" style="background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);">

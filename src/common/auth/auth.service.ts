@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { UserPayload } from '../interfaces/user.interface';
@@ -11,6 +11,8 @@ import { PrismaService } from '../../database/prisma.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private jwtService: JwtService,
     private prisma: PrismaService,
@@ -46,6 +48,48 @@ export class AuthService {
         role: role as any,
       },
     });
+
+    // If this is an ambassador signup, check if they were invited and update status
+    if (role === 'ambassador') {
+      try {
+        // First check if they have any ACCEPTED invitations and update to JOINED
+        const acceptedInvitations = await this.prisma.invitedAmbassador.findMany({
+          where: { 
+            ambassadorEmail: email,
+            status: 'ACCEPTED'
+          }
+        });
+
+        if (acceptedInvitations.length > 0) {
+          await this.prisma.invitedAmbassador.updateMany({
+            where: { 
+              ambassadorEmail: email,
+              status: 'ACCEPTED'
+            },
+            data: {
+              status: 'JOINED',
+              respondedAt: new Date()
+            }
+          });
+          this.logger.log(`📝 Updated invitation status to JOINED for ${email}`);
+        } else {
+          // If no ACCEPTED invitations, check for INVITED and update to ACCEPTED
+          await this.prisma.invitedAmbassador.updateMany({
+            where: { 
+              ambassadorEmail: email,
+              status: 'INVITED'
+            },
+            data: {
+              status: 'ACCEPTED',
+              respondedAt: new Date()
+            }
+          });
+          this.logger.log(`📝 Updated invitation status to ACCEPTED for ${email}`);
+        }
+      } catch (error) {
+        this.logger.warn(`⚠️ Could not update invitation status for ${email}: ${error.message}`);
+      }
+    }
 
     // Generate JWT token
     const payload: UserPayload = {

@@ -22,9 +22,9 @@ export class InvitedAmbassadorDto {
   @ApiProperty({ 
     description: 'Invitation status',
     example: 'INVITED',
-    enum: ['INVITED', 'ACCEPTED', 'DECLINED']
+    enum: ['INVITED', 'ACCEPTED', 'DECLINED', 'JOINED']
   })
-  status: 'INVITED' | 'ACCEPTED' | 'DECLINED';
+  status: 'INVITED' | 'ACCEPTED' | 'DECLINED' | 'JOINED';
 
   @ApiProperty({ 
     description: 'When the invitation was sent',
@@ -55,12 +55,13 @@ export class InvitationListResponseDto {
 
   @ApiProperty({ 
     description: 'Count by status',
-    example: { INVITED: 5, ACCEPTED: 8, DECLINED: 2 }
+    example: { INVITED: 5, ACCEPTED: 8, DECLINED: 2, JOINED: 3 }
   })
   statusCounts: {
     INVITED: number;
     ACCEPTED: number;
     DECLINED: number;
+    JOINED: number;
   };
 }
 
