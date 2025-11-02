@@ -57,6 +57,48 @@ export class ChatClickResponseDto {
   clickId?: string;
 }
 
+export class ChatClickAnswersDto {
+  @ApiProperty({ 
+    description: 'Click ID from the initial chat click',
+    example: 'click-abc123-def456'
+  })
+  @IsString()
+  @IsNotEmpty()
+  clickId: string;
+
+  @ApiProperty({ 
+    description: 'Answer to first question',
+    example: 'I want to know about admission requirements',
+    required: false
+  })
+  @IsString()
+  @IsOptional()
+  question1Answer?: string;
+
+  @ApiProperty({ 
+    description: 'Answer to second question',
+    example: 'Yes, I need help with visa application',
+    required: false
+  })
+  @IsString()
+  @IsOptional()
+  question2Answer?: string;
+}
+
+export class ChatClickAnswersResponseDto {
+  @ApiProperty({ 
+    description: 'Whether the answers were saved successfully',
+    example: true
+  })
+  success: boolean;
+
+  @ApiProperty({ 
+    description: 'Response message',
+    example: 'Answers saved successfully'
+  })
+  message: string;
+}
+
 export class ChatClickAnalyticsDto {
   @ApiProperty({ 
     description: 'Total number of chat clicks',

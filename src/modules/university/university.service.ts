@@ -86,6 +86,64 @@ export class UniversityService {
     return this.widgetStore.get(widgetId) || null;
   }
 
+  /**
+   * Get joined ambassadors for a widget (Public - for widget display)
+   */
+  async getJoinedAmbassadorsForWidget(widgetId: string): Promise<any[]> {
+    try {
+      // Find university profile by widgetId
+      const universityProfile = await this.prisma.universityProfile.findUnique({
+        where: { widgetId },
+        include: { user: true }
+      });
+
+      if (!universityProfile) {
+        return [];
+      }
+
+      // Get all joined ambassadors for this university
+      const joinedInvitations = await this.prisma.invitedAmbassador.findMany({
+        where: {
+          universityId: universityProfile.userId,
+          status: 'JOINED'
+        },
+        include: {
+          // We need to get the ambassador's profile and user info
+        }
+      });
+
+      // Get ambassador profiles for joined invitations
+      const ambassadorProfiles = [];
+      for (const invitation of joinedInvitations) {
+        // Find user by email
+        const ambassadorUser = await this.prisma.user.findUnique({
+          where: { email: invitation.ambassadorEmail },
+          include: {
+            ambassadorProfile: {
+              include: {
+                socialLinks: true,
+                user: true
+              }
+            }
+          }
+        });
+
+        if (ambassadorUser?.ambassadorProfile) {
+          ambassadorProfiles.push({
+            ...ambassadorUser.ambassadorProfile,
+            user: ambassadorUser,
+            socialLinks: ambassadorUser.ambassadorProfile.socialLinks
+          });
+        }
+      }
+
+      return ambassadorProfiles;
+    } catch (error) {
+      this.logger.error('Error getting joined ambassadors for widget:', error);
+      return [];
+    }
+  }
+
   async getUserWidget(userId: string): Promise<WidgetResponseDto | null> {
     try {
       const profile = await this.prisma.universityProfile.findUnique({
@@ -288,6 +346,53 @@ export class UniversityService {
   }
 
   /**
+   * Save answers to chat questions for a specific click
+   */
+  async saveChatClickAnswers(data: { clickId: string; question1Answer?: string; question2Answer?: string }): Promise<{ success: boolean; message: string }> {
+    try {
+      // Find the chat click record
+      const chatClick = await this.prisma.chatClick.findUnique({
+        where: { id: data.clickId }
+      });
+
+      if (!chatClick) {
+        return {
+          success: false,
+          message: 'Chat click not found'
+        };
+      }
+
+      // Update the chat click with answers
+      await this.prisma.chatClick.update({
+        where: { id: data.clickId },
+        data: {
+          question1Answer: data.question1Answer || null,
+          question2Answer: data.question2Answer || null
+        }
+      });
+
+      this.logger.log(`💬 Answers saved for click: ${data.clickId}`);
+      if (data.question1Answer) {
+        this.logger.log(`📝 Question 1 answer: ${data.question1Answer.substring(0, 50)}...`);
+      }
+      if (data.question2Answer) {
+        this.logger.log(`📝 Question 2 answer: ${data.question2Answer.substring(0, 50)}...`);
+      }
+
+      return {
+        success: true,
+        message: 'Answers saved successfully'
+      };
+    } catch (error) {
+      this.logger.error('❌ Error saving chat click answers:', error);
+      return {
+        success: false,
+        message: 'Failed to save answers'
+      };
+    }
+  }
+
+  /**
    * Get clicks by country for a widget (only for verified widgets owned by user)
    */
   async getChatClicksByCountry(widgetId: string, userId?: string): Promise<{ country: string; count: number }[]> {
@@ -385,64 +490,67 @@ export class UniversityService {
     return {
       html: `<iframe 
   src="${widgetUrl}" 
-  width="300" 
-  height="300" 
+  width="380" 
+  height="100vh" 
   frameborder="0" 
   scrolling="no"
-  style="border: none; position: fixed; right: -110px; top: 50%; transform: translateY(-50%); z-index: 9999; width: 300px;"
+  style="border: none; position: fixed; right: 20px; top: 50%; transform: translateY(-50%); z-index: 9999; width: 380px; height: 100vh;"
   title="University Navigation Widget">
 </iframe>`,
       
       react: `<iframe 
   src="${widgetUrl}" 
-  width="300" 
-  height="300" 
+  width="380" 
+  height="100vh" 
   frameBorder="0" 
   scrolling="no"
   style={{
     border: 'none',
     position: 'fixed',
-    right: '-110px',
+    right: '20px',
     top: '50%',
     transform: 'translateY(-50%)',
     zIndex: 9999,
-    width: '300px'
+    width: '380px',
+    height: '100vh'
   }}
   title="University Navigation Widget"
 />`,
       
       vue: `<iframe 
   :src="'${widgetUrl}'" 
-  width="300" 
-  height="300" 
+  width="380" 
+  height="100vh" 
   frameborder="0" 
   scrolling="no"
   :style="{
     border: 'none',
     position: 'fixed',
-    right: '-110px',
+    right: '20px',
     top: '50%',
     transform: 'translateY(-50%)',
     zIndex: 9999,
-    width: '300px'
+    width: '380px',
+    height: '100vh'
   }"
   title="University Navigation Widget">
 </iframe>`,
       
       angular: `<iframe 
   [src]="'${widgetUrl}'" 
-  width="300" 
-  height="300" 
+  width="380" 
+  height="100vh" 
   frameborder="0" 
   scrolling="no"
   [style]="{
     'border': 'none',
     'position': 'fixed',
-    'right': '-110px',
+    'right': '20px',
     'top': '50%',
     'transform': 'translateY(-50%)',
     'z-index': '9999',
-    'width': '300px'
+    'width': '380px',
+    'height': '100vh'
   }"
   title="University Navigation Widget">
 </iframe>`,
@@ -450,22 +558,22 @@ export class UniversityService {
       wordpress: `<!-- Add this to your WordPress theme's footer.php or use a plugin -->
 <iframe 
   src="${widgetUrl}" 
-  width="300" 
-  height="300" 
+  width="380" 
+  height="100vh" 
   frameborder="0" 
   scrolling="no"
-  style="border: none; position: fixed; right: -110px; top: 50%; transform: translateY(-50%); z-index: 9999; width: 300px;"
+  style="border: none; position: fixed; right: 20px; top: 50%; transform: translateY(-50%); z-index: 9999; width: 380px; height: 100vh;"
   title="University Navigation Widget">
 </iframe>`,
       
       shopify: `<!-- Add this to your Shopify theme's layout/theme.liquid file before </body> -->
 <iframe 
   src="${widgetUrl}" 
-  width="300" 
-  height="300" 
+  width="380" 
+  height="100vh" 
   frameborder="0" 
   scrolling="no"
-  style="border: none; position: fixed; right: -110px; top: 50%; transform: translateY(-50%); z-index: 9999; width: 300px;"
+  style="border: none; position: fixed; right: 20px; top: 50%; transform: translateY(-50%); z-index: 9999; width: 380px; height: 100vh;"
   title="University Navigation Widget">
 </iframe>`
     };
@@ -477,11 +585,11 @@ export class UniversityService {
     
     return `<iframe 
   src="${widgetUrl}" 
-  width="300" 
-  height="300" 
+  width="380" 
+  height="100vh" 
   frameborder="0" 
   scrolling="no"
-  style="border: none; position: fixed; right: -110px; top: 50%; transform: translateY(-50%); z-index: 9999; width: 300px;"
+  style="border: none; position: fixed; right: 20px; top: 50%; transform: translateY(-50%); z-index: 9999; width: 380px; height: 100vh;"
   title="University Navigation Widget">
 </iframe>`;
   }
@@ -538,13 +646,24 @@ export class UniversityService {
     const dynamicHeight = baseHeight + (iconCount - 1) * iconSpacing;
 
     // Build icon HTML
-    const iconsHTML = railIcons.map(({ name, icon, label, url }) => `
+    const iconsHTML = railIcons.map(({ name, icon, label, url }) => {
+      // Chat icon should not have a link - just be clickable
+      if (name === 'Chat') {
+        return `
+      <div class="widget-icon" data-tooltip="${label}" data-icon-name="${name}">
+        ${icon}
+      </div>
+    `;
+      } else {
+        return `
       <div class="widget-icon" data-tooltip="${label}" data-icon-name="${name}">
         <a href="${url}" target="_blank" rel="noopener noreferrer" data-icon-name="${name}">
           ${icon}
         </a>
       </div>
-    `).join('');
+    `;
+      }
+    }).join('');
 
     return `
 <!DOCTYPE html>
@@ -553,6 +672,9 @@ export class UniversityService {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Widget Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     * {
       margin: 0;
@@ -564,8 +686,8 @@ export class UniversityService {
       height: 100%;
       width: 100%;
       background: transparent;
-      overflow: hidden;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: visible;
+      font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
     
     .widget-container {
@@ -583,15 +705,19 @@ export class UniversityService {
       justify-content: space-evenly;
       padding: 6px;
       transition: height 0.3s ease-in-out;
-      margin: 0 auto;
+      margin: 0;
     }
     
     .widget-wrapper {
-      position: relative;
-      display: flex;
-      justify-content: flex-end;
-      width: 300px;
-      height: 100%;
+      position: fixed;
+      right: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: inline-block;
+      width: auto;
+      height: auto;
+      overflow: visible;
+      z-index: 9999;
     }
     
     .widget-icon {
@@ -625,6 +751,9 @@ export class UniversityService {
     .widget-icon svg {
       width: 18px;
       height: 18px;
+      color: #FFFFFF;
+      fill: none;
+      stroke: currentColor;
     }
     
     .tooltip {
@@ -658,12 +787,398 @@ export class UniversityService {
       opacity: 1;
       visibility: visible;
     }
+    
+    .chat-modal {
+      position: absolute;
+      top: calc(100% + 20px);
+      right: 0;
+      width: 320px;
+      max-width: calc(100vw - 40px);
+      max-height: 400px;
+      border-radius: 16px;
+      background: #FFFFFF1A;
+      border: 0.6px solid #FFFFFF;
+      backdrop-filter: blur(35px);
+      -webkit-backdrop-filter: blur(35px);
+      padding: 20px;
+      display: none;
+      flex-direction: column;
+      z-index: 999999;
+      opacity: 0;
+      transition: opacity 0.3s ease-in-out;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      white-space: normal;
+      word-wrap: break-word;
+    }
+    
+    .chat-modal.show {
+      display: flex;
+      opacity: 1;
+    }
+    
+    .chat-modal-question {
+      font-size: 14px;
+      color: #FFFFFF;
+      margin-bottom: 16px;
+      font-weight: 500;
+      line-height: 1.5;
+      white-space: normal;
+      word-wrap: break-word;
+      text-align: left;
+      writing-mode: horizontal-tb;
+      text-orientation: mixed;
+    }
+    
+    .chat-modal-textarea {
+      width: 100%;
+      min-height: 80px;
+      padding: 12px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 0.6px solid rgba(255, 255, 255, 0.3);
+      color: #FFFFFF;
+      font-size: 14px;
+      font-family: inherit;
+      resize: vertical;
+      margin-bottom: 16px;
+      outline: none;
+    }
+    
+    .chat-modal-textarea::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+    }
+    
+    .chat-modal-buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+    
+    .chat-modal-btn {
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: none;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .chat-modal-btn.skip {
+      background: rgba(255, 255, 255, 0.1);
+      color: #FFFFFF;
+      border: 0.6px solid rgba(255, 255, 255, 0.3);
+    }
+    
+    .chat-modal-btn.skip:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+    
+    .chat-modal-btn.send {
+      background: ${selectedColor};
+      color: #FFFFFF;
+    }
+    
+    .chat-modal-btn.send:hover {
+      opacity: 0.9;
+    }
+    
+    .chat-modal-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .ambassador-sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 377px;
+      height: 100vh;
+      background: #FFFFFF1A;
+      border: 1px solid #FFFFFF;
+      backdrop-filter: blur(35px);
+      -webkit-backdrop-filter: blur(35px);
+      display: none;
+      flex-direction: column;
+      z-index: 999999;
+      overflow-y: auto;
+      padding: 12.5px;
+      opacity: 0;
+      transition: opacity 0.3s ease-in-out;
+    }
+    
+    .ambassador-sidebar.show {
+      display: flex;
+      opacity: 1;
+    }
+    
+    .ambassador-profile {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      padding: 0;
+    }
+    
+    .ambassador-card {
+      width: 100%;
+      max-width: 352px;
+      height: 180px;
+      background: #F9FAFC;
+      border: 1px solid #D0D0D0;
+      border-radius: 8px;
+      padding: 12.5px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      box-sizing: border-box;
+      overflow: visible;
+    }
+    
+    .ambassador-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    .ambassador-card-avatar-wrapper {
+      width: 45px;
+      height: 45px;
+      flex-shrink: 0;
+      position: relative;
+    }
+    
+    .ambassador-card-avatar-img {
+      width: 45px;
+      height: 45px;
+      border-radius: 110.29px;
+      object-fit: cover;
+      display: block;
+    }
+    
+    .ambassador-card-avatar-placeholder {
+      width: 45px;
+      height: 45px;
+      border-radius: 110.29px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    
+    .ambassador-card-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+      min-width: 0;
+      overflow: visible;
+      max-width: 100%;
+    }
+    
+    .ambassador-card-name-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    
+    .ambassador-card-name {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 600;
+      font-style: normal;
+      font-size: 14px;
+      line-height: 19px;
+      letter-spacing: 0%;
+      vertical-align: middle;
+      color: #000000;
+      margin: 0;
+    }
+    
+    .ambassador-card-country {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 400;
+      font-style: normal;
+      font-size: 11px;
+      line-height: 19px;
+      letter-spacing: 0%;
+      vertical-align: middle;
+      color: #8A8A8A;
+      margin: 0;
+    }
+    
+    .ambassador-card-studying {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 400;
+      font-style: normal;
+      font-size: 11px;
+      line-height: 19px;
+      letter-spacing: 0%;
+      vertical-align: middle;
+      color: #8A8A8A;
+      margin: 0;
+    }
+    
+    .ambassador-card-course {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 600;
+      font-style: normal;
+      font-size: 11px;
+      line-height: 19px;
+      letter-spacing: 0%;
+      vertical-align: middle;
+      color: #000000;
+      margin: 0;
+    }
+    
+    .ambassador-card-university {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 600;
+      font-style: normal;
+      font-size: 11px;
+      line-height: 19px;
+      letter-spacing: 0%;
+      vertical-align: middle;
+      color: #000000;
+      margin: 0;
+    }
+    
+    .ambassador-card-about {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 400;
+      font-style: normal;
+      font-size: 12px;
+      line-height: 19px;
+      letter-spacing: 0%;
+      color: #848484;
+      margin-top: 13px;
+      margin-left: -36px;
+      padding-left: 0;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      white-space: normal;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      width: calc(100% + 36px);
+      max-width: calc(100% + 57px);
+      box-sizing: border-box;
+      max-height: calc(19px * 3);
+      position: relative;
+    }
+    
+    .ambassador-card-ask {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 400;
+      font-style: normal;
+      font-size: 12px;
+      line-height: 19px;
+      letter-spacing: 0%;
+      color: #000000;
+      margin: 4px 0 0 0;
+      text-align: right;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity 0.2s ease;
+    }
+    
+    .ambassador-card-ask:hover {
+      opacity: 0.7;
+    }
+    
+    .ambassador-profile-image {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #FFFFFF;
+      margin-bottom: 16px;
+    }
+    
+    .ambassador-profile-name {
+      font-size: 20px;
+      font-weight: 600;
+      color: #FFFFFF;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    
+    .ambassador-profile-subject {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.8);
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    
+    .ambassador-ask-button {
+      width: 100%;
+      padding: 12px 24px;
+      border-radius: 8px;
+      border: 1px solid #FFFFFF;
+      background: ${selectedColor};
+      color: #FFFFFF;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-bottom: 20px;
+    }
+    
+    .ambassador-ask-button:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+    
+    .ambassador-info {
+      margin-top: 20px;
+    }
+    
+    .ambassador-info-section {
+      margin-bottom: 20px;
+    }
+    
+    .ambassador-info-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #FFFFFF;
+      margin-bottom: 8px;
+    }
+    
+    .ambassador-info-text {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.7);
+      line-height: 1.6;
+    }
   </style>
 </head>
 <body>
   <div class="widget-wrapper">
     <div class="widget-container">
       ${iconsHTML}
+    </div>
+    <!-- Chat Modal positioned below widget-wrapper -->
+    <div class="chat-modal" id="chatModal">
+      <div class="chat-modal-question" id="chatModalQuestion"></div>
+      <textarea class="chat-modal-textarea" id="chatModalTextarea" placeholder="Type your answer here..."></textarea>
+      <div class="chat-modal-buttons">
+        <button class="chat-modal-btn skip" id="chatModalSkip">Skip</button>
+        <button class="chat-modal-btn send" id="chatModalSend">Send</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Ambassador Sidebar -->
+  <div class="ambassador-sidebar" id="ambassadorSidebar">
+    <div class="ambassador-profile" id="ambassadorProfileContent">
+      <!-- Ambassador profile will be loaded here -->
     </div>
   </div>
   
@@ -690,36 +1205,385 @@ export class UniversityService {
           tooltip.style.opacity = '0';
         });
 
-        // Track chat icon clicks
+        // Track chat icon clicks and show modal or sidebar
         const iconName = icon.getAttribute('data-icon-name');
-        const iconLink = icon.querySelector('a');
         
-        if (iconName === 'Chat' && iconLink) {
-          iconLink.addEventListener('click', function(e) {
-            // Track the chat icon click
+        if (iconName === 'Chat') {
+          // Chat icon has no link, so attach click listener directly to the icon div
+          icon.addEventListener('click', async function(e) {
+            // Track the chat icon click first
+            const clickData = {
+              widgetId: '${widgetId}',
+              domain: document.referrer || window.location.hostname,
+              timestamp: new Date().toISOString(),
+              userAgent: navigator.userAgent
+            };
+            
             try {
-              fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/chat-click', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  widgetId: '${widgetId}',
-                  domain: document.referrer || window.location.hostname,
-                  timestamp: new Date().toISOString(),
-                  userAgent: navigator.userAgent
-                })
-              }).then(response => response.json())
-                .then(data => {
-                  console.log('💬 Chat click tracked:', data);
-                })
-                .catch(err => console.log('Could not track chat click:', err));
+              // Check if there are joined ambassadors for this widget
+              const ambassadorsResponse = await fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/${widgetId}/joined-ambassadors');
+              const ambassadors = await ambassadorsResponse.json();
+              
+              if (ambassadors && ambassadors.length > 0) {
+                // Show ambassador sidebar with all ambassadors
+                showAmbassadorSidebar(ambassadors, clickData);
+              } else {
+                // No ambassador joined, show regular modal with questions
+                const clickResponse = await fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/chat-click', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify(clickData)
+                });
+                const data = await clickResponse.json();
+                console.log('💬 Chat click tracked:', data);
+                window.chatClickId = data.clickId;
+                showChatModal(1, clickData);
+              }
             } catch (error) {
-              console.log('Chat click tracking failed:', error);
+              console.log('Error checking ambassadors or tracking click:', error);
+              // Fallback to regular modal if there's an error
+              try {
+                const clickResponse = await fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/chat-click', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify(clickData)
+                });
+                const data = await clickResponse.json();
+                window.chatClickId = data.clickId;
+                showChatModal(1, clickData);
+              } catch (err) {
+                showChatModal(1, clickData);
+              }
             }
           });
         }
       });
+      
+      // Chat modal functionality
+      const chatModal = document.getElementById('chatModal');
+      const chatModalQuestion = document.getElementById('chatModalQuestion');
+      const chatModalTextarea = document.getElementById('chatModalTextarea');
+      const chatModalSkip = document.getElementById('chatModalSkip');
+      const chatModalSend = document.getElementById('chatModalSend');
+      
+      console.log('🔍 Modal elements found:', {
+        modal: !!chatModal,
+        question: !!chatModalQuestion,
+        textarea: !!chatModalTextarea,
+        skip: !!chatModalSkip,
+        send: !!chatModalSend
+      });
+      
+      const questions = [
+        'What would you like to know?',
+        'Is there anything else we can help you with?'
+      ];
+      
+      let currentQuestionIndex = 0;
+      let questionAnswers = {
+        question1: null,
+        question2: null
+      };
+      let clickDataForAnswers = null;
+      
+      // Ambassador sidebar functionality
+      const ambassadorSidebar = document.getElementById('ambassadorSidebar');
+      const ambassadorProfileContent = document.getElementById('ambassadorProfileContent');
+      let currentAmbassadorData = null;
+      let currentClickData = null;
+      
+      function showAmbassadorSidebar(ambassadors, clickData) {
+        currentClickData = clickData;
+        
+        // Track the click first
+        fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/chat-click', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(clickData)
+        }).then(response => response.json())
+          .then(data => {
+            console.log('💬 Chat click tracked:', data);
+            window.chatClickId = data.clickId;
+          })
+          .catch(err => console.log('Could not track chat click:', err));
+        
+        // Populate ambassador cards
+        const baseUrl = '${process.env.BASE_URL || 'http://localhost:3001'}';
+        let profileHTML = '';
+        
+        // Create a card for each ambassador
+        ambassadors.forEach((ambassador, index) => {
+          // Construct image URL properly
+          let profileImageUrl = null;
+          if (ambassador.profileImage) {
+            // Check if it's already a complete URL (http/https) or data URI
+            if (ambassador.profileImage.startsWith('http://') || 
+                ambassador.profileImage.startsWith('https://') ||
+                ambassador.profileImage.startsWith('data:')) {
+              // Use it directly (already complete URL or data URI)
+              profileImageUrl = ambassador.profileImage;
+            } else {
+              // It's a relative path, prepend baseUrl
+              profileImageUrl = baseUrl + (ambassador.profileImage.startsWith('/') ? ambassador.profileImage : '/' + ambassador.profileImage);
+            }
+            console.log('🖼️ Image URL for ambassador:', profileImageUrl.substring(0, 100) + '...');
+          } else {
+            console.log('⚠️ No profile image for ambassador:', ambassador);
+          }
+          
+          const ambassadorName = (ambassador.user && ambassador.user.fullName) || ambassador.ambassadorName || 'Ambassador';
+          const originCountry = ambassador.countryOriginal || '';
+          const studyingCountry = ambassador.countryCurrent || ambassador.currentlyLivingCountry || '';
+          const courseName = ambassador.subject || '';
+          const universityName = ambassador.currentUniversityName || (ambassador.user && ambassador.user.university) || '';
+          
+          profileHTML += '<div class="ambassador-card" data-ambassador-index="' + index + '">';
+          
+          // Avatar - always create placeholder, then try to load image
+          profileHTML += '<div class="ambassador-card-avatar-wrapper">';
+          if (profileImageUrl) {
+            profileHTML += '<img src="' + profileImageUrl + '" alt="' + ambassadorName + '" class="ambassador-card-avatar-img" onerror="this.style.display=\\'none\\'; this.nextElementSibling.style.display=\\'flex\\';">';
+          }
+          profileHTML += '<div class="ambassador-card-avatar-placeholder" style="' + (profileImageUrl ? 'display: none;' : 'display: flex;') + ' background: #DDDDDD; align-items: center; justify-content: center; color: #999999; font-size: 20px;">👤</div>';
+          profileHTML += '</div>';
+          
+          // Card info section
+          profileHTML += '<div class="ambassador-card-info">';
+          
+          // First line: Name, from country (left), studying in country (right)
+          profileHTML += '<div class="ambassador-card-name-row">';
+          profileHTML += '<div style="display: flex; align-items: center; gap: 4px;">';
+          profileHTML += '<p class="ambassador-card-name">' + ambassadorName + '</p>';
+          profileHTML += '<span class="ambassador-card-studying">from</span>';
+          if (originCountry) {
+            profileHTML += '<span class="ambassador-card-country">' + originCountry + '</span>';
+          }
+          profileHTML += '</div>';
+          if (studyingCountry) {
+            profileHTML += '<div style="display: flex; align-items: center; gap: 4px;">';
+            profileHTML += '<span class="ambassador-card-studying">studying in</span>';
+            profileHTML += '<span class="ambassador-card-country">' + studyingCountry + '</span>';
+            profileHTML += '</div>';
+          }
+          profileHTML += '</div>';
+          
+          // Second line: studying in, course name, at, university name
+          if (courseName || universityName) {
+            profileHTML += '<div class="ambassador-card-name-row" style="margin-top: 4px;">';
+            profileHTML += '<div style="display: flex; align-items: center; gap: 4px;">';
+            profileHTML += '<span class="ambassador-card-studying">studying</span>';
+            if (courseName) {
+              profileHTML += '<span class="ambassador-card-course">' + courseName + '</span>';
+            }
+            if (universityName) {
+              profileHTML += '<span class="ambassador-card-studying">at</span>';
+              profileHTML += '<span class="ambassador-card-university">' + universityName + '</span>';
+            }
+            profileHTML += '</div>';
+            profileHTML += '</div>';
+          }
+          
+          // About me section (3 lines with ellipsis) - aligned with image start
+          const aboutText = ambassador.whyStudyingCourse || ambassador.skilsExperience || '';
+          if (aboutText) {
+            // Escape HTML to prevent issues
+            const safeAboutText = aboutText.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            profileHTML += '<div class="ambassador-card-about">' + safeAboutText + '</div>';
+          }
+          
+          // Ask me a question (right aligned)
+          profileHTML += '<div class="ambassador-card-ask" data-card-index="' + index + '">Ask me a question</div>';
+          
+          profileHTML += '</div>';
+          
+          profileHTML += '</div>';
+        });
+        
+        ambassadorProfileContent.innerHTML = profileHTML;
+        
+        // Store ambassadors data for later use
+        window.ambassadorsData = ambassadors;
+        
+        // Add click handlers to "Ask me a question" buttons
+        const askButtons = ambassadorProfileContent.querySelectorAll('.ambassador-card-ask');
+        
+        // Handle "Ask me a question" clicks
+        askButtons.forEach((askBtn) => {
+          askBtn.addEventListener('click', function(e) {
+            e.stopPropagation(); // Prevent any parent click handlers
+            const cardIndex = parseInt(askBtn.getAttribute('data-card-index') || '0');
+            const selectedAmbassador = ambassadors[cardIndex];
+            currentAmbassadorData = selectedAmbassador;
+            // Close sidebar and show questions modal
+            hideAmbassadorSidebar();
+            showChatModal(1, clickData);
+          });
+        });
+        
+        // Show sidebar
+        ambassadorSidebar.style.display = 'flex';
+        setTimeout(() => {
+          ambassadorSidebar.classList.add('show');
+        }, 10);
+        
+        // Notify parent window
+        notifyParentModalOpen();
+      }
+      
+      function hideAmbassadorSidebar() {
+        ambassadorSidebar.classList.remove('show');
+        setTimeout(() => {
+          ambassadorSidebar.style.display = 'none';
+        }, 300);
+        currentAmbassadorData = null;
+        currentClickData = null;
+        if (window.ambassadorsData) {
+          delete window.ambassadorsData;
+        }
+      }
+      
+      // Card click handlers are added directly in showAmbassadorSidebar function
+      // Sidebar closes when clicking outside (handled in the document click listener below)
+      
+      // Function to notify parent window
+      const notifyParentModalOpen = function() {
+        try {
+          window.parent.postMessage({ type: 'chatModalOpened', widgetId: '${widgetId}' }, '*');
+        } catch (e) {
+          // Cross-origin - ignore
+        }
+      };
+      
+      function showChatModal(questionIndex, clickData) {
+        if (!chatModal) {
+          console.error('❌ Chat modal element not found!');
+          return;
+        }
+        
+        currentQuestionIndex = questionIndex - 1; // Convert to 0-based index
+        clickDataForAnswers = clickData;
+        chatModalQuestion.textContent = questions[currentQuestionIndex];
+        chatModalTextarea.value = '';
+        
+        // Modal is positioned absolutely below the widget-wrapper
+        // CSS handles positioning with top: calc(100% + 20px) and right: 0
+        // No need to set inline styles - CSS handles it
+        
+        // Force display before adding show class for transition
+        chatModal.style.display = 'flex';
+        setTimeout(() => {
+          chatModal.classList.add('show');
+        }, 10);
+        
+        // Notify parent window
+        notifyParentModalOpen();
+        
+        console.log('📱 Chat modal shown', {
+          question: questions[currentQuestionIndex],
+          hasShowClass: chatModal.classList.contains('show')
+        });
+      }
+      
+      function hideChatModal() {
+        chatModal.classList.remove('show');
+        currentQuestionIndex = 0;
+        questionAnswers = { question1: null, question2: null };
+        clickDataForAnswers = null;
+      }
+      
+      function sendAnswers() {
+        if (!clickDataForAnswers || !window.chatClickId) {
+          console.log('No click data or click ID available');
+          return;
+        }
+        
+        // Send answers to backend
+        fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/chat-click-answers', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            clickId: window.chatClickId,
+            question1Answer: questionAnswers.question1,
+            question2Answer: questionAnswers.question2
+          })
+        }).then(response => response.json())
+          .then(data => {
+            console.log('✅ Answers saved:', data);
+          })
+          .catch(err => {
+            console.log('Could not save answers:', err);
+          });
+      }
+      
+      chatModalSkip.addEventListener('click', function() {
+        // Skip current question - go to next or close
+        if (currentQuestionIndex === 0) {
+          // Skipped first question, show second
+          currentQuestionIndex = 1;
+          chatModalQuestion.textContent = questions[currentQuestionIndex];
+          chatModalTextarea.value = '';
+        } else {
+          // Skipped second question, close modal
+          sendAnswers(); // Send whatever answers we have (if any)
+          hideChatModal();
+        }
+      });
+      
+      chatModalSend.addEventListener('click', function() {
+        const answer = chatModalTextarea.value.trim();
+        
+        if (currentQuestionIndex === 0) {
+          // First question
+          questionAnswers.question1 = answer || null;
+          // Show second question
+          currentQuestionIndex = 1;
+          chatModalQuestion.textContent = questions[currentQuestionIndex];
+          chatModalTextarea.value = '';
+        } else {
+          // Second question - save and close
+          questionAnswers.question2 = answer || null;
+          sendAnswers();
+          hideChatModal();
+        }
+      });
+      
+      // Close modal when clicking outside - check both iframe and parent window
+      document.addEventListener('click', function(e) {
+        if (chatModal.classList.contains('show') && 
+            !chatModal.contains(e.target) && 
+            !e.target.closest('.widget-icon[data-icon-name="Chat"]')) {
+          // Save answers and close if on second question or if clicking outside modal
+          sendAnswers();
+          hideChatModal();
+        }
+        
+        // Close sidebar when clicking outside
+        if (ambassadorSidebar && ambassadorSidebar.classList.contains('show') && 
+            !ambassadorSidebar.contains(e.target) && 
+            !e.target.closest('.widget-icon[data-icon-name="Chat"]')) {
+          hideAmbassadorSidebar();
+        }
+      });
+      
+      // Close modal when clicking outside in parent window
+      // Since we're in an iframe, we need to communicate with parent
+      window.addEventListener('message', function(e) {
+        if (e.data && e.data.type === 'closeChatModal') {
+          if (chatModal.classList.contains('show')) {
+            sendAnswers();
+            hideChatModal();
+          }
+        }
+      });
+      
       
       // Notify backend that iframe is loaded
       try {

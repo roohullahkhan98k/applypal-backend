@@ -66,29 +66,29 @@ model AmbassadorProfile {
 }
 
 model UniversityProfile {
-  id                String   @id @default(uuid())
-  userId            String   @unique
-  widgetId          String?  @unique @map("widget_id")
-  isVerified        Boolean  @default(false) @map("is_verified")
-  widgetConfig      Json?    @map("widget_config")
-  email             String?  @unique
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String              @id @default(uuid())
+  userId             String              @unique
+  widgetId           String?             @unique @map("widget_id")
+  isVerified         Boolean             @default(false) @map("is_verified")
+  widgetConfig       Json?               @map("widget_config")
+  email              String?             @unique
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   invitedAmbassadors InvitedAmbassador[]
 
   @@map("university_profiles")
 }
 
 model InvitedAmbassador {
-  id                String   @id @default(uuid())
-  universityId      String   @map("university_id")
-  ambassadorName    String   @map("ambassador_name")
-  ambassadorEmail   String   @map("ambassador_email")
-  status            InvitationStatus @default(INVITED)
-  invitedAt         DateTime @default(now()) @map("invited_at")
-  respondedAt       DateTime? @map("responded_at")
-  university        UniversityProfile @relation(fields: [universityId], references: [userId], onDelete: Cascade)
+  id              String            @id @default(uuid())
+  universityId    String            @map("university_id")
+  ambassadorName  String            @map("ambassador_name")
+  ambassadorEmail String            @map("ambassador_email")
+  status          InvitationStatus  @default(INVITED)
+  invitedAt       DateTime          @default(now()) @map("invited_at")
+  respondedAt     DateTime?         @map("responded_at")
+  university      UniversityProfile @relation(fields: [universityId], references: [userId], onDelete: Cascade)
 
   @@map("invited_ambassadors")
 }
@@ -128,19 +128,21 @@ model Following {
 }
 
 model ChatClick {
-  id          String   @id @default(uuid())
-  widgetId    String   @map("widget_id")
-  domain      String
-  ipAddress   String   @map("ip_address")
-  country     String?
-  clickedAt   DateTime @default(now()) @map("clicked_at")
-  createdAt   DateTime @default(now()) @map("created_at")
+  id              String   @id @default(uuid())
+  widgetId        String   @map("widget_id")
+  domain          String
+  ipAddress       String   @map("ip_address")
+  country         String?
+  question1Answer String?  @map("question1_answer")
+  question2Answer String?  @map("question2_answer")
+  clickedAt       DateTime @default(now()) @map("clicked_at")
+  createdAt       DateTime @default(now()) @map("created_at")
 
-  @@map("chat_clicks")
   @@index([widgetId])
   @@index([domain])
   @@index([country])
   @@index([clickedAt])
+  @@map("chat_clicks")
 }
 
 enum UserRole {

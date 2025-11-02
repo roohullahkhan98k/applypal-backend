@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Widget Test Page</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px;
+            color: white;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+        
+        .subtitle {
+            font-size: 24px;
+            margin-bottom: 40px;
+            opacity: 0.9;
+        }
+        
+        .content {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            margin-top: 40px;
+        }
+        
+        .info {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+        
+        .info h3 {
+            margin-bottom: 10px;
+        }
+        
+        .info p {
+            line-height: 1.6;
+            opacity: 0.9;
+        }
+        
+        /* Widget will be positioned fixed on the right side via inline styles */
+    </style>
+    
+    <!-- Script to handle closing modal when clicking outside -->
+    <script>
+        // Listen for messages from iframe
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'chatModalOpened') {
+                console.log('Chat modal opened in iframe');
+                // Close modal when clicking outside the iframe
+                const clickHandler = function closeModal(e) {
+                    const iframe = document.querySelector('iframe[src*="/university/widget/"]');
+                    if (iframe && !iframe.contains(e.target)) {
+                        // Send message to iframe to close modal
+                        iframe.contentWindow.postMessage({ type: 'closeChatModal' }, '*');
+                        document.removeEventListener('click', clickHandler);
+                    }
+                };
+                document.addEventListener('click', clickHandler);
+            }
+        });
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>WIDGET TEST PAGE</h1>
+        <p class="subtitle">Testing the University Navigation Widget</p>
+        
+        <div class="content">
+            <h2>Welcome to the Test Page</h2>
+            <p>This page is for testing the widget functionality. The widget should appear on the right side of the screen.</p>
+            
+            <div class="info">
+                <h3>Widget Features:</h3>
+                <ul style="margin-left: 20px; margin-top: 10px;">
+                    <li>Click on the chat icon to open the modal</li>
+                    <li>The modal should appear below the widget</li>
+                    <li>Try clicking outside the modal to close it</li>
+                    <li>Answer the questions or skip them</li>
+                </ul>
+            </div>
+            
+            <div class="info" style="margin-top: 20px;">
+                <h3>Instructions:</h3>
+                <p>
+                    1. The widget is embedded on the right side of this page<br>
+                    2. Click the chat icon (bottom icon in the widget)<br>
+                    3. A modal will appear with questions<br>
+                    4. Try clicking anywhere on this page (outside the widget) to test the close functionality<br>
+                    5. Check the browser console for any logs
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Widget Iframe -->
+    <iframe 
+    src="http://localhost:3001/university/widget/27cb96de-40ea-44e3-a9ae-8c7b3ececa37" 
+    width="380" 
+    height="100vh" 
+    frameborder="0" 
+    scrolling="no"
+    style="border: none; position: fixed; right: 20px; top: 50%; transform: translateY(-50%); z-index: 9999; width: 380px; height: 100vh;"
+    title="University Navigation Widget">
+  </iframe>
+</body>
+</html>
+

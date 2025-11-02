@@ -19,7 +19,7 @@ import {
 import { Response } from 'express';
 import { UniversityService } from './university.service';
 import { WidgetConfigDto, WidgetResponseDto } from './dto/widget-config.dto';
-import { ChatClickDto, ChatClickResponseDto, ChatClickAnalyticsDto } from './dto/chat-click.dto';
+import { ChatClickDto, ChatClickResponseDto, ChatClickAnalyticsDto, ChatClickAnswersDto, ChatClickAnswersResponseDto } from './dto/chat-click.dto';
 import { SetUniversityEmailDto, SendInvitationDto, EmailResponseDto, InvitationResponseDto, BulkInvitationDto, BulkInvitationResponseDto } from './dto/email.dto';
 import { InvitedAmbassadorDto, InvitationListResponseDto, UpdateInvitationStatusDto } from './dto/invitation.dto';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard';
@@ -103,6 +103,19 @@ export class UniversityController {
     res.setHeader('X-Frame-Options', 'ALLOWALL');
     res.setHeader('Content-Security-Policy', "frame-ancestors *");
     res.send(html);
+  }
+
+  @Get('widget/:widgetId/joined-ambassadors')
+  @Public()
+  @ApiOperation({ summary: 'Get joined ambassadors for widget (Public Access)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Joined ambassadors retrieved successfully',
+  })
+  async getJoinedAmbassadorsForWidget(
+    @Param('widgetId') widgetId: string,
+  ): Promise<any[]> {
+    return this.universityService.getJoinedAmbassadorsForWidget(widgetId);
   }
 
   @Get('widget/:widgetId/config')
@@ -262,6 +275,32 @@ export class UniversityController {
   ): Promise<{ country: string; count: number }[]> {
     const userId = req.user?.id;
     return this.universityService.getChatClicksByCountry(widgetId, userId);
+  }
+
+  @Post('widget/chat-click-answers')
+  @Public()
+  @ApiOperation({ summary: 'Save answers to chat questions (Public Access)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Answers saved successfully',
+    type: ChatClickAnswersResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid answer data',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Chat click not found',
+  })
+  async saveChatClickAnswers(
+    @Body(new ValidationPipe({ 
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true 
+    })) data: ChatClickAnswersDto,
+  ): Promise<ChatClickAnswersResponseDto> {
+    return this.universityService.saveChatClickAnswers(data);
   }
 
   // ==================== EMAIL MANAGEMENT ENDPOINTS ====================
