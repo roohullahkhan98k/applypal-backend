@@ -34,6 +34,24 @@ export class ChatClickDto {
   @IsNotEmpty()
   timestamp: string;
 
+  @ApiProperty({ 
+    description: 'Ambassador ID if user selected an ambassador',
+    example: 'ambassador-abc123',
+    required: false
+  })
+  @IsString()
+  @IsOptional()
+  ambassadorId?: string;
+
+  @ApiProperty({ 
+    description: 'Ambassador name if user selected an ambassador',
+    example: 'John Doe',
+    required: false
+  })
+  @IsString()
+  @IsOptional()
+  ambassadorName?: string;
+
 }
 
 export class ChatClickResponseDto {
@@ -83,6 +101,24 @@ export class ChatClickAnswersDto {
   @IsString()
   @IsOptional()
   question2Answer?: string;
+
+  @ApiProperty({ 
+    description: 'Ambassador ID if user selected an ambassador',
+    example: 'ambassador-abc123',
+    required: false
+  })
+  @IsString()
+  @IsOptional()
+  ambassadorId?: string;
+
+  @ApiProperty({ 
+    description: 'Ambassador name if user selected an ambassador',
+    example: 'John Doe',
+    required: false
+  })
+  @IsString()
+  @IsOptional()
+  ambassadorName?: string;
 }
 
 export class ChatClickAnswersResponseDto {
@@ -107,46 +143,44 @@ export class ChatClickAnalyticsDto {
   totalClicks: number;
 
   @ApiProperty({ 
-    description: 'Clicks grouped by country',
-    example: [
-      { country: 'United States', count: 45 },
-      { country: 'Germany', count: 32 },
-      { country: 'Japan', count: 28 }
-    ]
-  })
-  clicksByCountry: { country: string; count: number }[];
-
-  @ApiProperty({ 
-    description: 'Clicks grouped by domain',
-    example: [
-      { domain: 'example.com', count: 60 },
-      { domain: 'test.com', count: 40 }
-    ]
-  })
-  clicksByDomain: { domain: string; count: number }[];
-
-  @ApiProperty({ 
-    description: 'Recent chat clicks (last 10)',
+    description: 'ALL individual chat click records with full details',
     example: [
       {
         id: 'click-123',
         domain: 'example.com',
+        ipAddress: '192.168.1.1',
         country: 'United States',
-        clickedAt: '2025-01-08T10:30:45.123Z'
+        ambassadorId: 'ambassador-abc123',
+        ambassadorName: 'John Doe',
+        question1Answer: 'I want to know about admission requirements',
+        question2Answer: 'Yes, I need help with visa',
+        clickedAt: '2025-01-08T10:30:45.123Z',
+        createdAt: '2025-01-08T10:30:45.123Z'
+      },
+      {
+        id: 'click-124',
+        domain: 'example.com',
+        ipAddress: '192.168.1.2',
+        country: 'Germany',
+        ambassadorId: null,
+        ambassadorName: null,
+        question1Answer: null,
+        question2Answer: null,
+        clickedAt: '2025-01-08T10:25:30.456Z',
+        createdAt: '2025-01-08T10:25:30.456Z'
       }
     ]
   })
-  recentClicks: {
+  clicks: {
     id: string;
     domain: string;
-    country?: string;
+    ipAddress: string;
+    country: string | null;
+    ambassadorId: string | null;
+    ambassadorName: string | null;
+    question1Answer: string | null;
+    question2Answer: string | null;
     clickedAt: string;
+    createdAt: string;
   }[];
-
-  @ApiProperty({ 
-    description: 'Last click timestamp',
-    example: '2025-01-08T10:30:45.123Z',
-    required: false
-  })
-  lastClick?: string;
 }

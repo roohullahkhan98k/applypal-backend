@@ -217,13 +217,50 @@ export class UniversityController {
     @Req() req: any,
   ): Promise<ChatClickResponseDto> {
     // Extract IP address from request
-    const ipAddress = req.ip || 
-                     req.connection?.remoteAddress || 
-                     req.socket?.remoteAddress ||
-                     (req.connection?.socket ? req.connection.socket.remoteAddress : null) ||
-                     req.headers['x-forwarded-for'] ||
-                     req.headers['x-real-ip'] ||
-                     'unknown';
+    // Priority: req.ip (works with trust proxy) > x-forwarded-for > x-real-ip > socket address
+    let ipAddress = req.ip;
+    
+    if (!ipAddress) {
+      // Try x-forwarded-for header (may contain multiple IPs, get the first one)
+      const forwardedFor = req.headers['x-forwarded-for'];
+      if (forwardedFor) {
+        const ips = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
+        ipAddress = typeof ips === 'string' ? ips.split(',')[0].trim() : ips;
+      }
+    }
+    
+    if (!ipAddress) {
+      // Try x-real-ip header
+      ipAddress = req.headers['x-real-ip'] as string;
+    }
+    
+    if (!ipAddress) {
+      // Fallback to socket connection IP
+      ipAddress = req.connection?.remoteAddress || 
+                  req.socket?.remoteAddress ||
+                  'unknown';
+    }
+    
+    // Normalize IP address
+    if (ipAddress) {
+      // Remove IPv6 prefix if present (::ffff:192.168.1.1 -> 192.168.1.1)
+      if (ipAddress.startsWith('::ffff:')) {
+        ipAddress = ipAddress.substring(7);
+      }
+      // Normalize IPv6 localhost to IPv4 localhost for consistency
+      else if (ipAddress === '::1') {
+        ipAddress = '127.0.0.1';
+      }
+      // Normalize IPv4 localhost variants
+      else if (ipAddress === 'localhost' || ipAddress === '::') {
+        ipAddress = '127.0.0.1';
+      }
+    }
+    
+    // Log IP extraction for debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🔍 IP Address extracted: ${ipAddress} (from req.ip: ${req.ip || 'N/A'})`);
+    }
     
     return this.universityService.recordChatClick(data, ipAddress);
   }

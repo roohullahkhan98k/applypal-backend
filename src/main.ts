@@ -8,6 +8,10 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   
+  // Enable trust proxy to get real IP addresses from headers
+  // This is essential for getting client IPs when behind proxies/load balancers
+  app.set('trust proxy', true);
+  
   // Increase request body size limit
   app.use(require('express').json({ limit: '10mb' }));
   app.use(require('express').urlencoded({ limit: '10mb', extended: true }));

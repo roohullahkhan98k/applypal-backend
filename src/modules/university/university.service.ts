@@ -348,7 +348,7 @@ export class UniversityService {
   /**
    * Save answers to chat questions for a specific click
    */
-  async saveChatClickAnswers(data: { clickId: string; question1Answer?: string; question2Answer?: string }): Promise<{ success: boolean; message: string }> {
+  async saveChatClickAnswers(data: { clickId: string; question1Answer?: string; question2Answer?: string; ambassadorId?: string; ambassadorName?: string }): Promise<{ success: boolean; message: string }> {
     try {
       // Find the chat click record
       const chatClick = await this.prisma.chatClick.findUnique({
@@ -362,13 +362,23 @@ export class UniversityService {
         };
       }
 
-      // Update the chat click with answers
+      // Update the chat click with answers and ambassador info (if not already set)
+      const updateData: any = {
+        question1Answer: data.question1Answer || null,
+        question2Answer: data.question2Answer || null
+      };
+      
+      // Only update ambassador info if not already set (from initial click) or if provided in answers
+      if (data.ambassadorId && !(chatClick as any).ambassadorId) {
+        updateData.ambassadorId = data.ambassadorId;
+      }
+      if (data.ambassadorName && !(chatClick as any).ambassadorName) {
+        updateData.ambassadorName = data.ambassadorName;
+      }
+
       await this.prisma.chatClick.update({
         where: { id: data.clickId },
-        data: {
-          question1Answer: data.question1Answer || null,
-          question2Answer: data.question2Answer || null
-        }
+        data: updateData
       });
 
       this.logger.log(`💬 Answers saved for click: ${data.clickId}`);
@@ -377,6 +387,9 @@ export class UniversityService {
       }
       if (data.question2Answer) {
         this.logger.log(`📝 Question 2 answer: ${data.question2Answer.substring(0, 50)}...`);
+      }
+      if (data.ambassadorName) {
+        this.logger.log(`👤 Ambassador: ${data.ambassadorName}`);
       }
 
       return {
@@ -1313,19 +1326,8 @@ export class UniversityService {
       function showAmbassadorSidebar(ambassadors, clickData) {
         currentClickData = clickData;
         
-        // Track the click first
-        fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/chat-click', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(clickData)
-        }).then(response => response.json())
-          .then(data => {
-            console.log('💬 Chat click tracked:', data);
-            window.chatClickId = data.clickId;
-          })
-          .catch(err => console.log('Could not track chat click:', err));
+        // NOTE: We do NOT track click here when ambassadors exist
+        // Click will only be tracked when user clicks "Ask me a question" button
         
         // Populate ambassador cards
         const baseUrl = '${process.env.BASE_URL || 'http://localhost:3001'}';
@@ -1429,14 +1431,44 @@ export class UniversityService {
         
         // Handle "Ask me a question" clicks
         askButtons.forEach((askBtn) => {
-          askBtn.addEventListener('click', function(e) {
+          askBtn.addEventListener('click', async function(e) {
             e.stopPropagation(); // Prevent any parent click handlers
             const cardIndex = parseInt(askBtn.getAttribute('data-card-index') || '0');
             const selectedAmbassador = ambassadors[cardIndex];
             currentAmbassadorData = selectedAmbassador;
+            
+            // Get ambassador info
+            const ambassadorId = selectedAmbassador.id || selectedAmbassador.userId || null;
+            const ambassadorName = (selectedAmbassador.user && selectedAmbassador.user.fullName) || 
+                                  selectedAmbassador.ambassadorName || 
+                                  'Unknown';
+            
+            // Track the chat click with ambassador info
+            const clickDataWithAmbassador = {
+              ...clickData,
+              ambassadorId: ambassadorId,
+              ambassadorName: ambassadorName
+            };
+            
+            try {
+              const clickResponse = await fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/chat-click', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(clickDataWithAmbassador)
+              });
+              const data = await clickResponse.json();
+              console.log('💬 Chat click tracked with ambassador:', data);
+              window.chatClickId = data.clickId;
+              clickDataForAnswers = clickDataWithAmbassador;
+            } catch (err) {
+              console.log('Could not track chat click:', err);
+            }
+            
             // Close sidebar and show questions modal
             hideAmbassadorSidebar();
-            showChatModal(1, clickData);
+            showChatModal(1, clickDataWithAmbassador);
           });
         });
         
@@ -1517,6 +1549,14 @@ export class UniversityService {
           return;
         }
         
+        // Get ambassador info if available
+        const ambassadorId = currentAmbassadorData?.id || currentAmbassadorData?.userId || null;
+        const ambassadorName = currentAmbassadorData ? (
+          (currentAmbassadorData.user && currentAmbassadorData.user.fullName) || 
+          currentAmbassadorData.ambassadorName || 
+          'Unknown'
+        ) : null;
+        
         // Send answers to backend
         fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/chat-click-answers', {
           method: 'POST',
@@ -1526,7 +1566,9 @@ export class UniversityService {
           body: JSON.stringify({
             clickId: window.chatClickId,
             question1Answer: questionAnswers.question1,
-            question2Answer: questionAnswers.question2
+            question2Answer: questionAnswers.question2,
+            ambassadorId: ambassadorId,
+            ambassadorName: ambassadorName
           })
         }).then(response => response.json())
           .then(data => {

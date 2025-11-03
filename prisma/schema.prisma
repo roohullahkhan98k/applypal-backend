@@ -133,6 +133,8 @@ model ChatClick {
   domain          String
   ipAddress       String   @map("ip_address")
   country         String?
+  ambassadorId    String?  @map("ambassador_id")
+  ambassadorName  String?  @map("ambassador_name")
   question1Answer String?  @map("question1_answer")
   question2Answer String?  @map("question2_answer")
   clickedAt       DateTime @default(now()) @map("clicked_at")
@@ -142,6 +144,7 @@ model ChatClick {
   @@index([domain])
   @@index([country])
   @@index([clickedAt])
+  @@index([ambassadorId])
   @@map("chat_clicks")
 }
 

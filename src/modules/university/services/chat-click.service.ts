@@ -35,6 +35,8 @@ export class ChatClickService {
           domain: clickData.domain,
           ipAddress,
           country: geolocationData.country,
+          ambassadorId: clickData.ambassadorId || null,
+          ambassadorName: clickData.ambassadorName || null,
           clickedAt: new Date(clickData.timestamp)
         }
       });
@@ -66,68 +68,45 @@ export class ChatClickService {
   /**
    * Get analytics data for a specific widget
    * @param widgetId - The widget ID to get analytics for
-   * @returns Analytics data including clicks by country, domain, etc.
+   * @returns Analytics data with ALL individual click records
    */
   async getChatClickAnalytics(widgetId: string): Promise<ChatClickAnalyticsDto> {
     try {
       this.logger.log(`📊 Getting chat click analytics for widget: ${widgetId}`);
 
-      // Get all clicks for this widget
+      // Get ALL clicks for this widget (no limit)
       const clicks = await this.prisma.chatClick.findMany({
         where: { widgetId },
-        orderBy: { clickedAt: 'desc' },
-        take: 1000 // Get last 1000 clicks for analytics
+        orderBy: { clickedAt: 'desc' }
       });
 
       if (clicks.length === 0) {
         return {
           totalClicks: 0,
-          clicksByCountry: [],
-          clicksByDomain: [],
-          recentClicks: []
+          clicks: []
         };
       }
 
-      // Group clicks by country
-      const countryStats = clicks.reduce((acc, click) => {
-        const country = click.country || 'Unknown';
-        const existing = acc.find(item => item.country === country);
-        if (existing) {
-          existing.count++;
-        } else {
-          acc.push({ country, count: 1 });
-        }
-        return acc;
-      }, [] as { country: string; count: number }[]);
-
-      // Group clicks by domain
-      const domainStats = clicks.reduce((acc, click) => {
-        const existing = acc.find(item => item.domain === click.domain);
-        if (existing) {
-          existing.count++;
-        } else {
-          acc.push({ domain: click.domain, count: 1 });
-        }
-        return acc;
-      }, [] as { domain: string; count: number }[]);
-
-      // Get recent clicks (last 10)
-      const recentClicks = clicks.slice(0, 10).map(click => ({
+      // Return ALL individual click records with full details
+      const allClicks = clicks.map(click => ({
         id: click.id,
         domain: click.domain,
-        country: click.country,
-        clickedAt: click.clickedAt.toISOString()
+        ipAddress: click.ipAddress,
+        country: click.country || null,
+        ambassadorId: click.ambassadorId || null,
+        ambassadorName: click.ambassadorName || null,
+        question1Answer: click.question1Answer || null,
+        question2Answer: click.question2Answer || null,
+        clickedAt: click.clickedAt.toISOString(),
+        createdAt: click.createdAt.toISOString()
       }));
 
       const analytics: ChatClickAnalyticsDto = {
         totalClicks: clicks.length,
-        clicksByCountry: countryStats.sort((a, b) => b.count - a.count),
-        clicksByDomain: domainStats.sort((a, b) => b.count - a.count),
-        recentClicks,
-        lastClick: clicks.length > 0 ? clicks[0].clickedAt.toISOString() : undefined
+        clicks: allClicks
       };
 
-      this.logger.log(`📊 Analytics generated: ${analytics.totalClicks} total clicks, ${analytics.clicksByCountry.length} countries`);
+      this.logger.log(`📊 Analytics generated: ${analytics.totalClicks} total clicks (ALL records sent)`);
       
       return analytics;
 
@@ -135,9 +114,7 @@ export class ChatClickService {
       this.logger.error('❌ Error getting chat click analytics:', error);
       return {
         totalClicks: 0,
-        clicksByCountry: [],
-        clicksByDomain: [],
-        recentClicks: []
+        clicks: []
       };
     }
   }
