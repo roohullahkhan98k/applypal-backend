@@ -708,10 +708,9 @@ export class UniversityService {
       width: 44px;
       height: ${dynamicHeight}px;
       border-radius: 720px;
-      background: #FFFFFF1A;
-      border: 0.6px solid #FFFFFF;
-      backdrop-filter: blur(35px);
-      -webkit-backdrop-filter: blur(35px);
+      background: rgba(19, 30, 66, 0.95);
+      border: none;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -790,10 +789,9 @@ export class UniversityService {
       min-width: 101px;
       border-radius: 21px;
       padding: 4px 10px;
-      background: #FFFFFF1A;
-      border: 0.6px solid #FFFFFF;
-      backdrop-filter: blur(35px);
-      -webkit-backdrop-filter: blur(35px);
+      background: rgba(19, 30, 66, 0.95);
+      border: none;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
       color: #FFFFFF;
       font-size: 12px;
       display: flex;
@@ -821,17 +819,15 @@ export class UniversityService {
       max-width: calc(100vw - 40px);
       max-height: 400px;
       border-radius: 16px;
-      background: #FFFFFF1A;
-      border: 0.6px solid #FFFFFF;
-      backdrop-filter: blur(35px);
-      -webkit-backdrop-filter: blur(35px);
+      background: rgba(19, 30, 66, 0.98);
+      border: none;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
       padding: 20px;
       display: none;
       flex-direction: column;
       z-index: 999999;
       opacity: 0;
       transition: opacity 0.3s ease-in-out;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
       white-space: normal;
       word-wrap: break-word;
     }
@@ -919,15 +915,14 @@ export class UniversityService {
       top: 0;
       width: 377px;
       height: 100vh;
-      background: #FFFFFF1A;
-      border: 1px solid #FFFFFF;
-      backdrop-filter: blur(35px);
-      -webkit-backdrop-filter: blur(35px);
+      background: rgba(19, 30, 66, 0.98);
+      border: none;
+      box-shadow: 2px 0 16px rgba(0, 0, 0, 0.3);
       display: none;
       flex-direction: column;
       z-index: 999999;
       overflow-y: auto;
-      padding: 12.5px;
+      padding: 0;
       opacity: 0;
       transition: opacity 0.3s ease-in-out;
     }
@@ -937,11 +932,66 @@ export class UniversityService {
       opacity: 1;
     }
     
+    .ambassador-sidebar-header {
+      position: relative;
+      padding: 12.5px;
+      padding-bottom: 5px;
+    }
+    
+    .ambassador-sidebar-close {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10002;
+      transition: all 0.2s ease;
+    }
+    
+    .ambassador-sidebar-close:hover {
+      background: rgba(255, 255, 255, 0.25);
+      transform: scale(1.1);
+    }
+    
+    .ambassador-sidebar-close svg {
+      width: 16px;
+      height: 16px;
+      color: #FFFFFF;
+      stroke: currentColor;
+      stroke-width: 2.5;
+    }
+    
     .ambassador-profile {
       display: flex;
       flex-direction: column;
       gap: 5px;
-      padding: 0;
+      padding: 0 12.5px 12.5px 12.5px;
+    }
+    
+    .widget-icon-loader {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 24px;
+      height: 24px;
+      border: 3px solid rgba(255, 255, 255, 0.2);
+      border-top-color: #FFFFFF;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      z-index: 10001;
+      pointer-events: none;
+    }
+    
+    @keyframes spin {
+      to { transform: translate(-50%, -50%) rotate(360deg); }
     }
     
     .ambassador-card {
@@ -1204,6 +1254,13 @@ export class UniversityService {
   
   <!-- Ambassador Sidebar -->
   <div class="ambassador-sidebar" id="ambassadorSidebar">
+    <div class="ambassador-sidebar-header">
+      <button class="ambassador-sidebar-close" id="ambassadorSidebarClose" title="Close">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
     <div class="ambassador-profile" id="ambassadorProfileContent">
       <!-- Ambassador profile will be loaded here -->
     </div>
@@ -1246,6 +1303,13 @@ export class UniversityService {
               userAgent: navigator.userAgent
             };
             
+            // Show loading state on chat icon - add loader overlay
+            let loader = document.createElement('div');
+            loader.className = 'widget-icon-loader';
+            loader.id = 'chatIconLoader';
+            icon.style.position = 'relative';
+            icon.appendChild(loader);
+            
             try {
               // Check if there are joined ambassadors for this widget
               const ambassadorsResponse = await fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/${widgetId}/joined-ambassadors');
@@ -1253,38 +1317,65 @@ export class UniversityService {
               
               if (ambassadors && ambassadors.length > 0) {
                 // Show ambassador sidebar with all ambassadors
-                showAmbassadorSidebar(ambassadors, clickData);
+                showAmbassadorSidebar(ambassadors, clickData, icon);
               } else {
-                // No ambassador joined, show regular modal with questions
-                const clickResponse = await fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/chat-click', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify(clickData)
+                // No ambassador joined - remove loading and show regular modal
+                const loaderElement = document.getElementById('chatIconLoader');
+                if (loaderElement) loaderElement.remove();
+                verifyRecaptcha('chat_click', function(verified) {
+                  if (verified) {
+                    fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/chat-click', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify(clickData)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                      console.log('💬 Chat click tracked:', data);
+                      window.chatClickId = data.clickId;
+                      showChatModal(1, clickData);
+                    })
+                    .catch(err => {
+                      console.log('Could not track chat click:', err);
+                      showChatModal(1, clickData);
+                    });
+                  } else {
+                    alert('Please complete the verification to continue.');
+                    const loaderElement = document.getElementById('chatIconLoader');
+                    if (loaderElement) loaderElement.remove();
+                  }
                 });
-                const data = await clickResponse.json();
-                console.log('💬 Chat click tracked:', data);
-                window.chatClickId = data.clickId;
-                showChatModal(1, clickData);
               }
             } catch (error) {
               console.log('Error checking ambassadors or tracking click:', error);
+              const loaderElement = document.getElementById('chatIconLoader');
+              if (loaderElement) loaderElement.remove();
               // Fallback to regular modal if there's an error
-              try {
-                const clickResponse = await fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/chat-click', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify(clickData)
-                });
-                const data = await clickResponse.json();
-                window.chatClickId = data.clickId;
-                showChatModal(1, clickData);
-              } catch (err) {
-                showChatModal(1, clickData);
-              }
+              verifyRecaptcha('chat_click', function(verified) {
+                if (verified) {
+                  fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/chat-click', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(clickData)
+                  })
+                  .then(response => response.json())
+                  .then(data => {
+                    window.chatClickId = data.clickId;
+                    showChatModal(1, clickData);
+                  })
+                  .catch(err => {
+                    showChatModal(1, clickData);
+                  });
+                } else {
+                  alert('Please complete the verification to continue.');
+                  const loaderElement = document.getElementById('chatIconLoader');
+                  if (loaderElement) loaderElement.remove();
+                }
+              });
             }
           });
         }
@@ -1323,7 +1414,7 @@ export class UniversityService {
       let currentAmbassadorData = null;
       let currentClickData = null;
       
-      function showAmbassadorSidebar(ambassadors, clickData) {
+      function showAmbassadorSidebar(ambassadors, clickData, chatIconElement) {
         currentClickData = clickData;
         
         // NOTE: We do NOT track click here when ambassadors exist
@@ -1476,6 +1567,11 @@ export class UniversityService {
         ambassadorSidebar.style.display = 'flex';
         setTimeout(() => {
           ambassadorSidebar.classList.add('show');
+          // Remove loading overlay from chat icon when sidebar is shown
+          if (chatIconElement) {
+            const loaderElement = document.getElementById('chatIconLoader');
+            if (loaderElement) loaderElement.remove();
+          }
         }, 10);
         
         // Notify parent window
@@ -1492,6 +1588,14 @@ export class UniversityService {
         if (window.ambassadorsData) {
           delete window.ambassadorsData;
         }
+      }
+      
+      // Close button handler
+      const sidebarCloseBtn = document.getElementById('ambassadorSidebarClose');
+      if (sidebarCloseBtn) {
+        sidebarCloseBtn.addEventListener('click', function() {
+          hideAmbassadorSidebar();
+        });
       }
       
       // Card click handlers are added directly in showAmbassadorSidebar function
