@@ -494,7 +494,7 @@ export class UniversityService {
   height="100vh" 
   frameborder="0" 
   scrolling="no"
-  style="border: none; position: fixed; right: 20px; top: 50%; transform: translateY(-50%); z-index: 9999; width: 380px; height: 100vh;"
+  style="border: none; position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 9999; width: 380px; height: 100vh;"
   title="University Navigation Widget">
 </iframe>`,
       
@@ -507,7 +507,7 @@ export class UniversityService {
   style={{
     border: 'none',
     position: 'fixed',
-    right: '20px',
+    right: '0',
     top: '50%',
     transform: 'translateY(-50%)',
     zIndex: 9999,
@@ -526,7 +526,7 @@ export class UniversityService {
   :style="{
     border: 'none',
     position: 'fixed',
-    right: '20px',
+    right: '0',
     top: '50%',
     transform: 'translateY(-50%)',
     zIndex: 9999,
@@ -545,7 +545,7 @@ export class UniversityService {
   [style]="{
     'border': 'none',
     'position': 'fixed',
-    'right': '20px',
+    'right': '0',
     'top': '50%',
     'transform': 'translateY(-50%)',
     'z-index': '9999',
@@ -562,7 +562,7 @@ export class UniversityService {
   height="100vh" 
   frameborder="0" 
   scrolling="no"
-  style="border: none; position: fixed; right: 20px; top: 50%; transform: translateY(-50%); z-index: 9999; width: 380px; height: 100vh;"
+  style="border: none; position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 9999; width: 380px; height: 100vh;"
   title="University Navigation Widget">
 </iframe>`,
       
@@ -573,7 +573,7 @@ export class UniversityService {
   height="100vh" 
   frameborder="0" 
   scrolling="no"
-  style="border: none; position: fixed; right: 20px; top: 50%; transform: translateY(-50%); z-index: 9999; width: 380px; height: 100vh;"
+  style="border: none; position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 9999; width: 380px; height: 100vh;"
   title="University Navigation Widget">
 </iframe>`
     };
@@ -589,7 +589,7 @@ export class UniversityService {
   height="100vh" 
   frameborder="0" 
   scrolling="no"
-  style="border: none; position: fixed; right: 20px; top: 50%; transform: translateY(-50%); z-index: 9999; width: 380px; height: 100vh;"
+  style="border: none; position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 9999; width: 380px; height: 100vh;"
   title="University Navigation Widget">
 </iframe>`;
   }
@@ -708,9 +708,20 @@ export class UniversityService {
       margin: 0;
     }
     
-    .widget-wrapper {
+    .main-wrapper {
       position: fixed;
-      right: 20px;
+      right: 0;
+      top: 0;
+      width: 100%;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 9998;
+    }
+    
+    .widget-wrapper {
+      position: absolute;
+      right: 0;
+      margin-right: 20px;
       top: 50%;
       transform: translateY(-50%);
       display: inline-block;
@@ -718,6 +729,7 @@ export class UniversityService {
       height: auto;
       overflow: visible;
       z-index: 9999;
+      pointer-events: auto;
     }
     
     .widget-icon {
@@ -1160,17 +1172,19 @@ export class UniversityService {
   </style>
 </head>
 <body>
-  <div class="widget-wrapper">
-    <div class="widget-container">
-      ${iconsHTML}
-    </div>
-    <!-- Chat Modal positioned below widget-wrapper -->
-    <div class="chat-modal" id="chatModal">
-      <div class="chat-modal-question" id="chatModalQuestion"></div>
-      <textarea class="chat-modal-textarea" id="chatModalTextarea" placeholder="Type your answer here..."></textarea>
-      <div class="chat-modal-buttons">
-        <button class="chat-modal-btn skip" id="chatModalSkip">Skip</button>
-        <button class="chat-modal-btn send" id="chatModalSend">Send</button>
+  <div class="main-wrapper">
+    <div class="widget-wrapper">
+      <div class="widget-container">
+        ${iconsHTML}
+      </div>
+      <!-- Chat Modal positioned below widget-wrapper -->
+      <div class="chat-modal" id="chatModal">
+        <div class="chat-modal-question" id="chatModalQuestion"></div>
+        <textarea class="chat-modal-textarea" id="chatModalTextarea" placeholder="Type your answer here..."></textarea>
+        <div class="chat-modal-buttons">
+          <button class="chat-modal-btn skip" id="chatModalSkip">Skip</button>
+          <button class="chat-modal-btn send" id="chatModalSend">Send</button>
+        </div>
       </div>
     </div>
   </div>
