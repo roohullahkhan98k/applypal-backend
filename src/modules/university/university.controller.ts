@@ -421,7 +421,7 @@ export class UniversityController {
     return this.universityService.updateInvitationStatus(token, 'ACCEPTED');
   }
 
-  @Get('invitations/decline')
+  @Get('invitations/:token/decline')
   @Public()
   @ApiOperation({ summary: 'Handle invitation decline (Public Access)' })
   @ApiResponse({
