@@ -830,11 +830,13 @@ export class UniversityService {
       transition: opacity 0.3s ease-in-out;
       white-space: normal;
       word-wrap: break-word;
+      pointer-events: none;
     }
     
     .chat-modal.show {
       display: flex;
       opacity: 1;
+      pointer-events: auto;
     }
     
     .chat-modal-question {
@@ -1299,61 +1301,65 @@ export class UniversityService {
         if (iconName === 'Chat') {
           // Chat icon has no link, so attach click listener directly to the icon div
           icon.addEventListener('click', async function(e) {
-            // Track the chat icon click first
-            const clickData = {
-              widgetId: '${widgetId}',
-              domain: document.referrer || window.location.hostname,
-              timestamp: new Date().toISOString(),
-              userAgent: navigator.userAgent
-            };
-            
-            // Show loading state on chat icon - add loader overlay
-            let loader = document.createElement('div');
-            loader.className = 'widget-icon-loader';
-            loader.id = 'chatIconLoader';
-            icon.style.position = 'relative';
-            icon.appendChild(loader);
-            
-            const removeLoader = () => {
-              const loaderElement = document.getElementById('chatIconLoader');
-              if (loaderElement) loaderElement.remove();
-            };
-            
-            const trackChatClick = async () => {
-              try {
-                const response = await fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/chat-click', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify(clickData)
-                });
-                const data = await response.json();
-                console.log('💬 Chat click tracked:', data);
-                window.chatClickId = data.clickId;
-              } catch (err) {
-                console.log('Could not track chat click:', err);
-              }
-              showChatModal(1, clickData);
-            };
-
             try {
-              // Check if there are joined ambassadors for this widget
-              const ambassadorsResponse = await fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/${widgetId}/joined-ambassadors');
-              const ambassadors = await ambassadorsResponse.json();
+              // Track the chat icon click first
+              const clickData = {
+                widgetId: '${widgetId}',
+                domain: document.referrer || window.location.hostname,
+                timestamp: new Date().toISOString(),
+                userAgent: navigator.userAgent
+              };
               
-              if (ambassadors && ambassadors.length > 0) {
-                removeLoader();
-                // Show ambassador sidebar with all ambassadors
-                showAmbassadorSidebar(ambassadors, clickData, icon);
-              } else {
+              // Show loading state on chat icon - add loader overlay
+              let loader = document.createElement('div');
+              loader.className = 'widget-icon-loader';
+              loader.id = 'chatIconLoader';
+              icon.style.position = 'relative';
+              icon.appendChild(loader);
+              
+              const removeLoader = () => {
+                const loaderElement = document.getElementById('chatIconLoader');
+                if (loaderElement) loaderElement.remove();
+              };
+              
+              const trackChatClick = async () => {
+                try {
+                  const response = await fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/chat-click', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(clickData)
+                  });
+                  const data = await response.json();
+                  console.log('💬 Chat click tracked:', data);
+                  window.chatClickId = data.clickId;
+                } catch (err) {
+                  console.log('Could not track chat click:', err);
+                }
+                showChatModal(1, clickData);
+              };
+
+              try {
+                // Check if there are joined ambassadors for this widget
+                const ambassadorsResponse = await fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/${widgetId}/joined-ambassadors');
+                const ambassadors = await ambassadorsResponse.json();
+                
+                if (ambassadors && ambassadors.length > 0) {
+                  removeLoader();
+                  // Show ambassador sidebar with all ambassadors
+                  showAmbassadorSidebar(ambassadors, clickData, icon);
+                } else {
+                  await trackChatClick();
+                  removeLoader();
+                }
+              } catch (error) {
+                console.log('Error checking ambassadors or tracking click:', error);
                 await trackChatClick();
                 removeLoader();
               }
-            } catch (error) {
-              console.log('Error checking ambassadors or tracking click:', error);
-              await trackChatClick();
-              removeLoader();
+            } catch (err) {
+              console.error('Unexpected error handling chat icon click:', err);
             }
           });
         }
@@ -1605,6 +1611,7 @@ export class UniversityService {
         
         // Force display before adding show class for transition
         chatModal.style.display = 'flex';
+      chatModal.style.pointerEvents = 'auto';
         setTimeout(() => {
           chatModal.classList.add('show');
         }, 10);
@@ -1620,6 +1627,10 @@ export class UniversityService {
       
       function hideChatModal() {
         chatModal.classList.remove('show');
+        chatModal.style.pointerEvents = 'none';
+        setTimeout(() => {
+          chatModal.style.display = 'none';
+        }, 300);
         currentQuestionIndex = 0;
         questionAnswers = { question1: null, question2: null };
         clickDataForAnswers = null;
