@@ -924,12 +924,16 @@ export class UniversityService {
       overflow-y: auto;
       padding: 0;
       opacity: 0;
-      transition: opacity 0.3s ease-in-out;
+      pointer-events: none;
+      transform: translateX(-100%);
+      transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
     }
     
     .ambassador-sidebar.show {
       display: flex;
       opacity: 1;
+      pointer-events: auto;
+      transform: translateX(0);
     }
     
     .ambassador-sidebar-header {
@@ -1310,72 +1314,46 @@ export class UniversityService {
             icon.style.position = 'relative';
             icon.appendChild(loader);
             
+            const removeLoader = () => {
+              const loaderElement = document.getElementById('chatIconLoader');
+              if (loaderElement) loaderElement.remove();
+            };
+            
+            const trackChatClick = async () => {
+              try {
+                const response = await fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/chat-click', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify(clickData)
+                });
+                const data = await response.json();
+                console.log('💬 Chat click tracked:', data);
+                window.chatClickId = data.clickId;
+              } catch (err) {
+                console.log('Could not track chat click:', err);
+              }
+              showChatModal(1, clickData);
+            };
+
             try {
               // Check if there are joined ambassadors for this widget
               const ambassadorsResponse = await fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/${widgetId}/joined-ambassadors');
               const ambassadors = await ambassadorsResponse.json();
               
               if (ambassadors && ambassadors.length > 0) {
+                removeLoader();
                 // Show ambassador sidebar with all ambassadors
                 showAmbassadorSidebar(ambassadors, clickData, icon);
               } else {
-                // No ambassador joined - remove loading and show regular modal
-                const loaderElement = document.getElementById('chatIconLoader');
-                if (loaderElement) loaderElement.remove();
-                verifyRecaptcha('chat_click', function(verified) {
-                  if (verified) {
-                    fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/chat-click', {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                      },
-                      body: JSON.stringify(clickData)
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                      console.log('💬 Chat click tracked:', data);
-                      window.chatClickId = data.clickId;
-                      showChatModal(1, clickData);
-                    })
-                    .catch(err => {
-                      console.log('Could not track chat click:', err);
-                      showChatModal(1, clickData);
-                    });
-                  } else {
-                    alert('Please complete the verification to continue.');
-                    const loaderElement = document.getElementById('chatIconLoader');
-                    if (loaderElement) loaderElement.remove();
-                  }
-                });
+                await trackChatClick();
+                removeLoader();
               }
             } catch (error) {
               console.log('Error checking ambassadors or tracking click:', error);
-              const loaderElement = document.getElementById('chatIconLoader');
-              if (loaderElement) loaderElement.remove();
-              // Fallback to regular modal if there's an error
-              verifyRecaptcha('chat_click', function(verified) {
-                if (verified) {
-                  fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/chat-click', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(clickData)
-                  })
-                  .then(response => response.json())
-                  .then(data => {
-                    window.chatClickId = data.clickId;
-                    showChatModal(1, clickData);
-                  })
-                  .catch(err => {
-                    showChatModal(1, clickData);
-                  });
-                } else {
-                  alert('Please complete the verification to continue.');
-                  const loaderElement = document.getElementById('chatIconLoader');
-                  if (loaderElement) loaderElement.remove();
-                }
-              });
+              await trackChatClick();
+              removeLoader();
             }
           });
         }
