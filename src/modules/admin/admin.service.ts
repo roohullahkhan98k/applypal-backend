@@ -179,9 +179,6 @@ export class AdminService {
 
     const [chatClicks, total] = await Promise.all([
       this.prisma.chatClick.findMany({
-        include: {
-          // We need to get university info from widgetId
-        },
         skip,
         take: limit,
         orderBy: { clickedAt: 'desc' },
