@@ -1,0 +1,78 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: applypal-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-applypal}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-applypal123}
+      POSTGRES_DB: ${POSTGRES_DB:-applypal}
+    ports:
+      - "${POSTGRES_PORT:-5434}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-applypal}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - applypal-network
+
+  # NestJS Backend Application
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: applypal-backend
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      # Server
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3000
+      BASE_URL: ${BASE_URL:-http://localhost:3000}
+      
+      # Database
+      DATABASE_URL: postgresql://${POSTGRES_USER:-applypal}:${POSTGRES_PASSWORD:-applypal123}@postgres:5432/${POSTGRES_DB:-applypal}?schema=public
+      DIRECT_URL: postgresql://${POSTGRES_USER:-applypal}:${POSTGRES_PASSWORD:-applypal123}@postgres:5432/${POSTGRES_DB:-applypal}?schema=public
+      
+      # JWT
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-in-production}
+      
+      # Email (SMTP)
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      
+      # Frontend
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      
+      # Geolocation
+      IP_API_KEY: ${IP_API_KEY:-free}
+    volumes:
+      - ./uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - applypal-network
+    command: >
+      sh -c "
+        echo 'Waiting for database to be ready...' &&
+        npx prisma migrate deploy &&
+        echo 'Migrations completed!' &&
+        node dist/main
+      "
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  applypal-network:
+    driver: bridge
+
