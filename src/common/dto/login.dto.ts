@@ -22,6 +22,6 @@ export class LoginDto {
     enum: UserRole,
     example: UserRole.ambassador,
   })
-  @IsEnum(UserRole, { message: 'Role must be either ambassador or university' })
+  @IsEnum(UserRole, { message: 'Role must be ambassador, university, or admin' })
   role: UserRole;
 }

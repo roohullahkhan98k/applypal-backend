@@ -151,4 +151,5 @@ model ChatClick {
 enum UserRole {
   ambassador
   university
+  admin
 }

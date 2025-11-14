@@ -23,7 +23,8 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "prisma:reset": "prisma migrate reset",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "admin:create": "node scripts/create-admin.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",

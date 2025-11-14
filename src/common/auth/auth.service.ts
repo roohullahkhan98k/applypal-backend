@@ -21,6 +21,11 @@ export class AuthService {
   async signup(signupDto: SignupDto): Promise<AuthResponseDto> {
     const { fullName, email, university, password, confirmPassword, role } = signupDto;
 
+    // Prevent admin signup through regular signup endpoint
+    if (role === 'admin') {
+      throw new ConflictException('Admin accounts cannot be created via signup. Please contact system administrator.');
+    }
+
     // Check if passwords match
     if (password !== confirmPassword) {
       throw new ConflictException('Passwords do not match');
@@ -31,7 +36,12 @@ export class AuthService {
       where: { email },
     });
     if (existingUser) {
-      const roleText = existingUser.role === 'ambassador' ? 'Ambassador' : 'University';
+      const roleTexts: Record<string, string> = {
+        ambassador: 'Ambassador',
+        university: 'University',
+        admin: 'Admin',
+      };
+      const roleText = roleTexts[existingUser.role] || existingUser.role;
       throw new ConflictException(`This email is already registered as a ${roleText}. Please use a different email or login with your existing account.`);
     }
 
@@ -128,8 +138,13 @@ export class AuthService {
 
     // Check if the role matches
     if (existingUser.role !== role) {
-      const currentRoleText = existingUser.role === 'ambassador' ? 'Ambassador' : 'University';
-      const requestedRoleText = role === 'ambassador' ? 'Ambassador' : 'University';
+      const roleTexts: Record<string, string> = {
+        ambassador: 'Ambassador',
+        university: 'University',
+        admin: 'Admin',
+      };
+      const currentRoleText = roleTexts[existingUser.role] || existingUser.role;
+      const requestedRoleText = roleTexts[role] || role;
       throw new UnauthorizedException(`This email is registered as a ${currentRoleText}, not as a ${requestedRoleText}. Please login with the correct role.`);
     }
 

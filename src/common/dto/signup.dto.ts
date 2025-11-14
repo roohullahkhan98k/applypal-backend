@@ -53,6 +53,6 @@ export class SignupDto {
     enum: UserRole,
     example: UserRole.ambassador,
   })
-  @IsEnum(UserRole, { message: 'Role must be either ambassador or university' })
+  @IsEnum(UserRole, { message: 'Role must be ambassador or university (admin cannot be created via signup)' })
   role: UserRole;
 }

@@ -6,6 +6,7 @@ import { AmbassadorModule } from './modules/ambassador/ambassador.module';
 import { UniversityModule } from './modules/university/university.module';
 import { DeleteAccountModule } from './common/delete-account/delete-account.module';
 import { HealthModule } from './common/health/health.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { HealthModule } from './common/health/health.module';
     UniversityModule,
     DeleteAccountModule,
     HealthModule,
+    AdminModule,
   ],
 })
 export class AppModule {}
