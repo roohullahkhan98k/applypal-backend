@@ -377,7 +377,7 @@ export class AdminService {
       throw new Error('User not found');
     }
 
-    if (user.role === 'admin') {
+    if ((user.role as unknown as string) === 'admin') {
       throw new Error('Cannot delete admin user');
     }
 

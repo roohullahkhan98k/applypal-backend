@@ -38,7 +38,7 @@ __decorate([
         enum: client_1.UserRole,
         example: client_1.UserRole.ambassador,
     }),
-    (0, class_validator_1.IsEnum)(client_1.UserRole, { message: 'Role must be either ambassador or university' }),
+    (0, class_validator_1.IsEnum)(client_1.UserRole, { message: 'Role must be ambassador, university, or admin' }),
     __metadata("design:type", String)
 ], LoginDto.prototype, "role", void 0);
 //# sourceMappingURL=login.dto.js.map

@@ -15,6 +15,7 @@ const ambassador_module_1 = require("./modules/ambassador/ambassador.module");
 const university_module_1 = require("./modules/university/university.module");
 const delete_account_module_1 = require("./common/delete-account/delete-account.module");
 const health_module_1 = require("./common/health/health.module");
+const admin_module_1 = require("./modules/admin/admin.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -34,6 +35,7 @@ exports.AppModule = AppModule = __decorate([
             university_module_1.UniversityModule,
             delete_account_module_1.DeleteAccountModule,
             health_module_1.HealthModule,
+            admin_module_1.AdminModule,
         ],
     })
 ], AppModule);

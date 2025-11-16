@@ -69,7 +69,7 @@ __decorate([
         enum: client_1.UserRole,
         example: client_1.UserRole.ambassador,
     }),
-    (0, class_validator_1.IsEnum)(client_1.UserRole, { message: 'Role must be either ambassador or university' }),
+    (0, class_validator_1.IsEnum)(client_1.UserRole, { message: 'Role must be ambassador or university (admin cannot be created via signup)' }),
     __metadata("design:type", String)
 ], SignupDto.prototype, "role", void 0);
 //# sourceMappingURL=signup.dto.js.map

@@ -22,7 +22,7 @@ export class AuthService {
     const { fullName, email, university, password, confirmPassword, role } = signupDto;
 
     // Prevent admin signup through regular signup endpoint
-    if (role === 'admin') {
+    if ((role as unknown as string) === 'admin') {
       throw new ConflictException('Admin accounts cannot be created via signup. Please contact system administrator.');
     }
 

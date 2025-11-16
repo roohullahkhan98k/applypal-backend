@@ -23,6 +23,9 @@ let AuthService = AuthService_1 = class AuthService {
     }
     async signup(signupDto) {
         const { fullName, email, university, password, confirmPassword, role } = signupDto;
+        if (role === 'admin') {
+            throw new common_1.ConflictException('Admin accounts cannot be created via signup. Please contact system administrator.');
+        }
         if (password !== confirmPassword) {
             throw new common_1.ConflictException('Passwords do not match');
         }
@@ -30,7 +33,12 @@ let AuthService = AuthService_1 = class AuthService {
             where: { email },
         });
         if (existingUser) {
-            const roleText = existingUser.role === 'ambassador' ? 'Ambassador' : 'University';
+            const roleTexts = {
+                ambassador: 'Ambassador',
+                university: 'University',
+                admin: 'Admin',
+            };
+            const roleText = roleTexts[existingUser.role] || existingUser.role;
             throw new common_1.ConflictException(`This email is already registered as a ${roleText}. Please use a different email or login with your existing account.`);
         }
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -110,8 +118,13 @@ let AuthService = AuthService_1 = class AuthService {
             throw new common_1.UnauthorizedException('Invalid credentials');
         }
         if (existingUser.role !== role) {
-            const currentRoleText = existingUser.role === 'ambassador' ? 'Ambassador' : 'University';
-            const requestedRoleText = role === 'ambassador' ? 'Ambassador' : 'University';
+            const roleTexts = {
+                ambassador: 'Ambassador',
+                university: 'University',
+                admin: 'Admin',
+            };
+            const currentRoleText = roleTexts[existingUser.role] || existingUser.role;
+            const requestedRoleText = roleTexts[role] || role;
             throw new common_1.UnauthorizedException(`This email is registered as a ${currentRoleText}, not as a ${requestedRoleText}. Please login with the correct role.`);
         }
         const isPasswordValid = await bcrypt.compare(password, existingUser.passwordHash);
