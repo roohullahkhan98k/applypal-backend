@@ -28,31 +28,24 @@ services:
     container_name: applypal-backend
     restart: unless-stopped
     ports:
-      - "${PORT:-3000}:3000"
+      - "3001:3001"
     environment:
-      # Server
-      NODE_ENV: ${NODE_ENV:-production}
-      PORT: 3000
-      BASE_URL: ${BASE_URL:-http://localhost:3000}
-      
-      # Database
-      DATABASE_URL: postgresql://${POSTGRES_USER:-applypal}:${POSTGRES_PASSWORD:-applypal123}@postgres:5432/${POSTGRES_DB:-applypal}?schema=public
-      DIRECT_URL: postgresql://${POSTGRES_USER:-applypal}:${POSTGRES_PASSWORD:-applypal123}@postgres:5432/${POSTGRES_DB:-applypal}?schema=public
-      
-      # JWT
-      JWT_SECRET: ${JWT_SECRET:-change-this-secret-in-production}
-      
-      # Email (SMTP)
-      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASS: ${SMTP_PASS:-}
-      
-      # Frontend
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      
-      # Geolocation
-      IP_API_KEY: ${IP_API_KEY:-free}
+      NODE_ENV: ${NODE_ENV}
+      PORT: ${PORT}
+      BASE_URL: ${BASE_URL}
+      BACKEND_URL: ${BACKEND_URL}
+      DATABASE_URL: ${DATABASE_URL}
+      DIRECT_URL: ${DIRECT_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      FRONTEND_URL: ${FRONTEND_URL}
+      SIGNUP_URL: ${SIGNUP_URL}
+      DECLINE_URL: ${DECLINE_URL}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_KEY: ${SUPABASE_KEY}
     volumes:
       - ./uploads:/app/uploads
     depends_on:
@@ -62,9 +55,9 @@ services:
       - applypal-network
     command: >
       sh -c "
-        echo 'Waiting for database to be ready...' &&
+        echo 'Running Prisma migrate deploy...' &&
         npx prisma migrate deploy &&
-        echo 'Migrations completed!' &&
+        echo 'Starting app...' &&
         node dist/main
       "
 

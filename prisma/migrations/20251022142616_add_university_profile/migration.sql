@@ -1,5 +1,5 @@
--- CreateTable
-CREATE TABLE "public"."university_profiles" (
+-- CreateTable (only if it doesn't exist)
+CREATE TABLE IF NOT EXISTS "public"."university_profiles" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "widget_id" TEXT,
@@ -10,11 +10,17 @@ CREATE TABLE "public"."university_profiles" (
     CONSTRAINT "university_profiles_pkey" PRIMARY KEY ("id")
 );
 
--- CreateIndex
-CREATE UNIQUE INDEX "university_profiles_userId_key" ON "public"."university_profiles"("userId");
+-- CreateIndex (only if it doesn't exist)
+CREATE UNIQUE INDEX IF NOT EXISTS "university_profiles_userId_key" ON "public"."university_profiles"("userId");
 
--- CreateIndex
-CREATE UNIQUE INDEX "university_profiles_widget_id_key" ON "public"."university_profiles"("widget_id");
+-- CreateIndex (only if it doesn't exist)
+CREATE UNIQUE INDEX IF NOT EXISTS "university_profiles_widget_id_key" ON "public"."university_profiles"("widget_id");
 
--- AddForeignKey
-ALTER TABLE "public"."university_profiles" ADD CONSTRAINT "university_profiles_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- AddForeignKey (only if it doesn't exist)
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'university_profiles_userId_fkey'
+  ) THEN
+    ALTER TABLE "public"."university_profiles" ADD CONSTRAINT "university_profiles_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
