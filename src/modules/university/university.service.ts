@@ -88,13 +88,14 @@ export class UniversityService {
 
   /**
    * Get joined ambassadors for a widget (Public - for widget display)
+   * OPTIMIZED: Uses batch queries instead of N+1 queries for instant loading
    */
   async getJoinedAmbassadorsForWidget(widgetId: string): Promise<any[]> {
     try {
-      // Find university profile by widgetId
+      // Find university profile by widgetId (only get userId, no need for full user object)
       const universityProfile = await this.prisma.universityProfile.findUnique({
         where: { widgetId },
-        include: { user: true }
+        select: { userId: true }
       });
 
       if (!universityProfile) {
@@ -107,35 +108,48 @@ export class UniversityService {
           universityId: universityProfile.userId,
           status: 'JOINED'
         },
-        include: {
-          // We need to get the ambassador's profile and user info
+        select: {
+          ambassadorEmail: true
         }
       });
 
-      // Get ambassador profiles for joined invitations
-      const ambassadorProfiles = [];
-      for (const invitation of joinedInvitations) {
-        // Find user by email
-        const ambassadorUser = await this.prisma.user.findUnique({
-          where: { email: invitation.ambassadorEmail },
-          include: {
-            ambassadorProfile: {
-              include: {
-                socialLinks: true,
-                user: true
-              }
+      // If no joined ambassadors, return empty array immediately
+      if (joinedInvitations.length === 0) {
+        return [];
+      }
+
+      // Extract all ambassador emails
+      const ambassadorEmails = joinedInvitations.map(inv => inv.ambassadorEmail);
+
+      // Get ALL ambassador users and profiles in a SINGLE batch query (no N+1!)
+      const ambassadorUsers = await this.prisma.user.findMany({
+        where: {
+          email: { in: ambassadorEmails },
+          role: 'ambassador'
+        },
+        include: {
+          ambassadorProfile: {
+            include: {
+              socialLinks: true
             }
           }
-        });
-
-        if (ambassadorUser?.ambassadorProfile) {
-          ambassadorProfiles.push({
-            ...ambassadorUser.ambassadorProfile,
-            user: ambassadorUser,
-            socialLinks: ambassadorUser.ambassadorProfile.socialLinks
-          });
         }
-      }
+      });
+
+      // Map to the expected format
+      const ambassadorProfiles = ambassadorUsers
+        .filter(user => user.ambassadorProfile) // Only include users with profiles
+        .map(user => ({
+          ...user.ambassadorProfile,
+          user: {
+            id: user.id,
+            fullName: user.fullName,
+            email: user.email,
+            university: user.university,
+            role: user.role
+          },
+          socialLinks: user.ambassadorProfile.socialLinks
+        }));
 
       return ambassadorProfiles;
     } catch (error) {

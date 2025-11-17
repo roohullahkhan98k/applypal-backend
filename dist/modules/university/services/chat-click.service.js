@@ -23,25 +23,26 @@ let ChatClickService = ChatClickService_1 = class ChatClickService {
     async recordChatClick(clickData, ipAddress) {
         try {
             this.logger.log(`💬 Processing chat click for widget: ${clickData.widgetId}`);
-            const geolocationData = await this.geolocationService.getLocationFromIp(ipAddress);
             const chatClick = await this.prisma.chatClick.create({
                 data: {
                     widgetId: clickData.widgetId,
                     domain: clickData.domain,
                     ipAddress,
-                    country: geolocationData.country,
+                    country: null,
                     ambassadorId: clickData.ambassadorId || null,
                     ambassadorName: clickData.ambassadorName || null,
                     clickedAt: new Date(clickData.timestamp)
                 }
             });
+            this.updateGeolocationInBackground(chatClick.id, ipAddress).catch(err => {
+                this.logger.warn(`⚠️ Background geolocation update failed for click ${chatClick.id}: ${err.message}`);
+            });
             this.logger.log(`💬 CHAT ICON CLICKED! Widget: ${clickData.widgetId}`);
             this.logger.log(`📱 Domain: ${clickData.domain}`);
-            this.logger.log(`🌍 Country: ${geolocationData.country}`);
             this.logger.log(`🌐 IP: ${ipAddress}`);
             this.logger.log(`⏰ Timestamp: ${clickData.timestamp}`);
             this.logger.log(`🆔 Click ID: ${chatClick.id}`);
-            this.logger.log(`✅ Click recorded successfully`);
+            this.logger.log(`✅ Click recorded instantly (geolocation updating in background)`);
             return {
                 success: true,
                 message: 'Chat click recorded successfully',
@@ -54,6 +55,19 @@ let ChatClickService = ChatClickService_1 = class ChatClickService {
                 success: false,
                 message: 'Failed to record chat click'
             };
+        }
+    }
+    async updateGeolocationInBackground(clickId, ipAddress) {
+        try {
+            const geolocationData = await this.geolocationService.getLocationFromIp(ipAddress);
+            await this.prisma.chatClick.update({
+                where: { id: clickId },
+                data: { country: geolocationData.country }
+            });
+            this.logger.log(`📍 Geolocation updated for click ${clickId}: ${geolocationData.country}`);
+        }
+        catch (error) {
+            this.logger.error(`❌ Failed to update geolocation for click ${clickId}:`, error);
         }
     }
     async getChatClickAnalytics(widgetId) {

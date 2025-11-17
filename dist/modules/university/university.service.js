@@ -81,7 +81,7 @@ let UniversityService = UniversityService_1 = class UniversityService {
         try {
             const universityProfile = await this.prisma.universityProfile.findUnique({
                 where: { widgetId },
-                include: { user: true }
+                select: { userId: true }
             });
             if (!universityProfile) {
                 return [];
@@ -91,29 +91,40 @@ let UniversityService = UniversityService_1 = class UniversityService {
                     universityId: universityProfile.userId,
                     status: 'JOINED'
                 },
-                include: {}
+                select: {
+                    ambassadorEmail: true
+                }
             });
-            const ambassadorProfiles = [];
-            for (const invitation of joinedInvitations) {
-                const ambassadorUser = await this.prisma.user.findUnique({
-                    where: { email: invitation.ambassadorEmail },
-                    include: {
-                        ambassadorProfile: {
-                            include: {
-                                socialLinks: true,
-                                user: true
-                            }
+            if (joinedInvitations.length === 0) {
+                return [];
+            }
+            const ambassadorEmails = joinedInvitations.map(inv => inv.ambassadorEmail);
+            const ambassadorUsers = await this.prisma.user.findMany({
+                where: {
+                    email: { in: ambassadorEmails },
+                    role: 'ambassador'
+                },
+                include: {
+                    ambassadorProfile: {
+                        include: {
+                            socialLinks: true
                         }
                     }
-                });
-                if (ambassadorUser?.ambassadorProfile) {
-                    ambassadorProfiles.push({
-                        ...ambassadorUser.ambassadorProfile,
-                        user: ambassadorUser,
-                        socialLinks: ambassadorUser.ambassadorProfile.socialLinks
-                    });
                 }
-            }
+            });
+            const ambassadorProfiles = ambassadorUsers
+                .filter(user => user.ambassadorProfile)
+                .map(user => ({
+                ...user.ambassadorProfile,
+                user: {
+                    id: user.id,
+                    fullName: user.fullName,
+                    email: user.email,
+                    university: user.university,
+                    role: user.role
+                },
+                socialLinks: user.ambassadorProfile.socialLinks
+            }));
             return ambassadorProfiles;
         }
         catch (error) {

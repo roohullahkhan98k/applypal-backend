@@ -7,6 +7,7 @@ export declare class ChatClickService {
     private readonly logger;
     constructor(prisma: PrismaService, geolocationService: GeolocationService);
     recordChatClick(clickData: ChatClickDto, ipAddress: string): Promise<ChatClickResponseDto>;
+    private updateGeolocationInBackground;
     getChatClickAnalytics(widgetId: string): Promise<ChatClickAnalyticsDto>;
     getClickCount(widgetId: string): Promise<number>;
     getClicksByCountry(widgetId: string): Promise<{

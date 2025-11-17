@@ -14,9 +14,10 @@ export class ChatClickService {
 
   /**
    * Record a chat icon click with full tracking data
+   * OPTIMIZED: Returns instantly, geolocation updated in background
    * @param clickData - The chat click data from the iframe
    * @param ipAddress - The user's IP address
-   * @returns Success response with click ID
+   * @returns Success response with click ID (returns instantly!)
    */
   async recordChatClick(
     clickData: ChatClickDto, 
@@ -25,31 +26,33 @@ export class ChatClickService {
     try {
       this.logger.log(`💬 Processing chat click for widget: ${clickData.widgetId}`);
 
-      // Get geolocation data for the IP address
-      const geolocationData = await this.geolocationService.getLocationFromIp(ipAddress);
-
-      // Store the chat click in database
+      // Store the chat click IMMEDIATELY without waiting for geolocation (INSTANT RESPONSE!)
       const chatClick = await this.prisma.chatClick.create({
         data: {
           widgetId: clickData.widgetId,
           domain: clickData.domain,
           ipAddress,
-          country: geolocationData.country,
+          country: null, // Will be updated in background
           ambassadorId: clickData.ambassadorId || null,
           ambassadorName: clickData.ambassadorName || null,
           clickedAt: new Date(clickData.timestamp)
         }
       });
 
-      // Enhanced logging with emojis and details
+      // Update geolocation in BACKGROUND (non-blocking, doesn't delay response)
+      this.updateGeolocationInBackground(chatClick.id, ipAddress).catch(err => {
+        this.logger.warn(`⚠️ Background geolocation update failed for click ${chatClick.id}: ${err.message}`);
+      });
+
+      // Enhanced logging
       this.logger.log(`💬 CHAT ICON CLICKED! Widget: ${clickData.widgetId}`);
       this.logger.log(`📱 Domain: ${clickData.domain}`);
-      this.logger.log(`🌍 Country: ${geolocationData.country}`);
       this.logger.log(`🌐 IP: ${ipAddress}`);
       this.logger.log(`⏰ Timestamp: ${clickData.timestamp}`);
       this.logger.log(`🆔 Click ID: ${chatClick.id}`);
-      this.logger.log(`✅ Click recorded successfully`);
+      this.logger.log(`✅ Click recorded instantly (geolocation updating in background)`);
 
+      // Return INSTANTLY without waiting for geolocation!
       return {
         success: true,
         message: 'Chat click recorded successfully',
@@ -62,6 +65,27 @@ export class ChatClickService {
         success: false,
         message: 'Failed to record chat click'
       };
+    }
+  }
+
+  /**
+   * Update geolocation data in the background (non-blocking)
+   * @param clickId - The chat click ID to update
+   * @param ipAddress - The IP address to lookup
+   */
+  private async updateGeolocationInBackground(clickId: string, ipAddress: string): Promise<void> {
+    try {
+      const geolocationData = await this.geolocationService.getLocationFromIp(ipAddress);
+      
+      await this.prisma.chatClick.update({
+        where: { id: clickId },
+        data: { country: geolocationData.country }
+      });
+
+      this.logger.log(`📍 Geolocation updated for click ${clickId}: ${geolocationData.country}`);
+    } catch (error) {
+      this.logger.error(`❌ Failed to update geolocation for click ${clickId}:`, error);
+      // Don't throw - this is background work, failures are acceptable
     }
   }
 
