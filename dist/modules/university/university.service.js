@@ -1219,41 +1219,36 @@ let UniversityService = UniversityService_1 = class UniversityService {
                 } catch (err) {
                   console.log('Could not track chat click:', err);
                 }
-                showChatModal(1, clickData);
+                // Note: Modal is shown separately, not here
               };
 
-              // Show UI INSTANTLY - don't wait for API calls!
+              // Show sidebar INSTANTLY with loading state - don't wait for anything!
               removeLoader();
+              showAmbassadorSidebar([], clickData, icon, true); // Show sidebar immediately with loading
               
-              // Show sidebar immediately with loading state
-              showAmbassadorSidebar([], clickData, icon, true); // true = loading state
+              // Track click in BACKGROUND (non-blocking)
+              trackChatClick().catch(err => {
+                console.log('Could not track chat click:', err);
+              });
               
               // Load ambassadors in BACKGROUND (non-blocking)
               fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/${widgetId}/joined-ambassadors')
                 .then(response => response.json())
                 .then(ambassadors => {
                   if (ambassadors && ambassadors.length > 0) {
-                    // Update sidebar with actual ambassadors
+                    // Ambassadors exist - populate sidebar with actual data
                     showAmbassadorSidebar(ambassadors, clickData, icon, false);
                   } else {
                     // No ambassadors - close sidebar and show modal instead
-                    const sidebar = document.getElementById('ambassadorSidebar');
-                    if (sidebar) {
-                      sidebar.classList.remove('show');
-                      setTimeout(() => sidebar.style.display = 'none', 300);
-                    }
-                    trackChatClick();
+                    hideAmbassadorSidebar();
+                    showChatModal(1, clickData);
                   }
                 })
                 .catch(error => {
                   console.log('Error loading ambassadors:', error);
                   // On error, close sidebar and show modal
-                  const sidebar = document.getElementById('ambassadorSidebar');
-                  if (sidebar) {
-                    sidebar.classList.remove('show');
-                    setTimeout(() => sidebar.style.display = 'none', 300);
-                  }
-                  trackChatClick();
+                  hideAmbassadorSidebar();
+                  showChatModal(1, clickData);
                 });
             } catch (err) {
               console.error('Unexpected error handling chat icon click:', err);
