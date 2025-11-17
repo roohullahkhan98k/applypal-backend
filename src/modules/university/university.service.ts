@@ -1287,6 +1287,24 @@ export class UniversityService {
   </div>
   
   <script>
+    // Check for ambassadors on widget load and cache the result
+    let cachedAmbassadors = null;
+    let ambassadorsCheckComplete = false;
+    
+    // Load ambassadors when widget initializes (non-blocking)
+    fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/${widgetId}/joined-ambassadors')
+      .then(response => response.json())
+      .then(ambassadors => {
+        cachedAmbassadors = ambassadors && ambassadors.length > 0 ? ambassadors : null;
+        ambassadorsCheckComplete = true;
+        console.log('✅ Ambassadors check complete:', cachedAmbassadors ? cachedAmbassadors.length + ' found' : 'none');
+      })
+      .catch(error => {
+        console.log('Error checking ambassadors on load:', error);
+        cachedAmbassadors = null;
+        ambassadorsCheckComplete = true;
+      });
+    
     // Add tooltip functionality and chat click tracking
     document.addEventListener('DOMContentLoaded', function() {
       const icons = document.querySelectorAll('.widget-icon');
@@ -1354,33 +1372,84 @@ export class UniversityService {
                 // Note: Modal is shown separately, not here
               };
 
-              // Show sidebar INSTANTLY with loading state - don't wait for anything!
+              // Remove loader immediately - we'll show sidebar/modal instantly
               removeLoader();
-              showAmbassadorSidebar([], clickData, icon, true); // Show sidebar immediately with loading
               
-              // Track click in BACKGROUND (non-blocking)
+              // Track click in BACKGROUND (non-blocking) - get IP later
               trackChatClick().catch(err => {
                 console.log('Could not track chat click:', err);
               });
               
-              // Load ambassadors in BACKGROUND (non-blocking)
-              fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/${widgetId}/joined-ambassadors')
-                .then(response => response.json())
-                .then(ambassadors => {
-                  if (ambassadors && ambassadors.length > 0) {
-                    // Ambassadors exist - populate sidebar with actual data
-                    showAmbassadorSidebar(ambassadors, clickData, icon, false);
-                  } else {
-                    // No ambassadors - close sidebar and show modal instead
+              // Always refresh ambassadors on chat click to get latest data
+              // Use cached data for instant response, then update if changed
+              const useCachedData = () => {
+                if (cachedAmbassadors && cachedAmbassadors.length > 0) {
+                  // Ambassadors exist - show sidebar with data instantly
+                  showAmbassadorSidebar(cachedAmbassadors, clickData, icon, false);
+                } else {
+                  // No ambassadors - show modal instantly
+                  showChatModal(1, clickData);
+                }
+              };
+              
+              // Show instant response using cached data
+              if (ambassadorsCheckComplete) {
+                useCachedData();
+              } else {
+                // Initial check still in progress - show loading, then use cached when ready
+                showAmbassadorSidebar([], clickData, icon, true);
+                const checkInterval = setInterval(() => {
+                  if (ambassadorsCheckComplete) {
+                    clearInterval(checkInterval);
+                    useCachedData();
+                  }
+                }, 50);
+                setTimeout(() => {
+                  clearInterval(checkInterval);
+                  if (!ambassadorsCheckComplete) {
                     hideAmbassadorSidebar();
                     showChatModal(1, clickData);
                   }
+                }, 3000);
+              }
+              
+              // Refresh ambassadors in background to update cache for next time
+              fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/${widgetId}/joined-ambassadors')
+                .then(response => response.json())
+                .then(ambassadors => {
+                  const newAmbassadors = ambassadors && ambassadors.length > 0 ? ambassadors : null;
+                  const hasChanged = JSON.stringify(cachedAmbassadors) !== JSON.stringify(newAmbassadors);
+                  
+                  if (hasChanged) {
+                    cachedAmbassadors = newAmbassadors;
+                    console.log('🔄 Ambassadors cache updated:', cachedAmbassadors ? cachedAmbassadors.length + ' found' : 'none');
+                    
+                    // If sidebar/modal is currently open, update it with new data
+                    const sidebar = document.getElementById('ambassadorSidebar');
+                    const modal = document.getElementById('chatModal');
+                    
+                    if (sidebar && sidebar.classList.contains('show')) {
+                      // Sidebar is open - update it with new data
+                      if (cachedAmbassadors && cachedAmbassadors.length > 0) {
+                        showAmbassadorSidebar(cachedAmbassadors, clickData, icon, false);
+                      } else {
+                        // Ambassadors were removed - close sidebar and show modal
+                        hideAmbassadorSidebar();
+                        showChatModal(1, clickData);
+                      }
+                    } else if (modal && modal.classList.contains('show')) {
+                      // Modal is open - if ambassadors were added, switch to sidebar
+                      if (cachedAmbassadors && cachedAmbassadors.length > 0) {
+                        hideChatModal();
+                        showAmbassadorSidebar(cachedAmbassadors, clickData, icon, false);
+                      }
+                      // If no ambassadors, modal stays open (correct state)
+                    }
+                  }
                 })
                 .catch(error => {
-                  console.log('Error loading ambassadors:', error);
-                  // On error, close sidebar and show modal
-                  hideAmbassadorSidebar();
-                  showChatModal(1, clickData);
+                  console.log('Error refreshing ambassadors:', error);
+                  // Don't update cache on error - keep using existing cache
                 });
             } catch (err) {
               console.error('Unexpected error handling chat icon click:', err);
