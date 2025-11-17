@@ -1354,24 +1354,39 @@ export class UniversityService {
                 showChatModal(1, clickData);
               };
 
-              try {
-                // Check if there are joined ambassadors for this widget
-                const ambassadorsResponse = await fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/${widgetId}/joined-ambassadors');
-                const ambassadors = await ambassadorsResponse.json();
-                
-                if (ambassadors && ambassadors.length > 0) {
-                  removeLoader();
-                  // Show ambassador sidebar with all ambassadors
-                  showAmbassadorSidebar(ambassadors, clickData, icon);
-                } else {
-                  await trackChatClick();
-                  removeLoader();
-                }
-              } catch (error) {
-                console.log('Error checking ambassadors or tracking click:', error);
-                await trackChatClick();
-                removeLoader();
-              }
+              // Show UI INSTANTLY - don't wait for API calls!
+              removeLoader();
+              
+              // Show sidebar immediately with loading state
+              showAmbassadorSidebar([], clickData, icon, true); // true = loading state
+              
+              // Load ambassadors in BACKGROUND (non-blocking)
+              fetch('${process.env.BASE_URL || 'http://localhost:3001'}/university/widget/${widgetId}/joined-ambassadors')
+                .then(response => response.json())
+                .then(ambassadors => {
+                  if (ambassadors && ambassadors.length > 0) {
+                    // Update sidebar with actual ambassadors
+                    showAmbassadorSidebar(ambassadors, clickData, icon, false);
+                  } else {
+                    // No ambassadors - close sidebar and show modal instead
+                    const sidebar = document.getElementById('ambassadorSidebar');
+                    if (sidebar) {
+                      sidebar.classList.remove('show');
+                      setTimeout(() => sidebar.style.display = 'none', 300);
+                    }
+                    trackChatClick();
+                  }
+                })
+                .catch(error => {
+                  console.log('Error loading ambassadors:', error);
+                  // On error, close sidebar and show modal
+                  const sidebar = document.getElementById('ambassadorSidebar');
+                  if (sidebar) {
+                    sidebar.classList.remove('show');
+                    setTimeout(() => sidebar.style.display = 'none', 300);
+                  }
+                  trackChatClick();
+                });
             } catch (err) {
               console.error('Unexpected error handling chat icon click:', err);
             }
@@ -1412,8 +1427,29 @@ export class UniversityService {
       let currentAmbassadorData = null;
       let currentClickData = null;
       
-      function showAmbassadorSidebar(ambassadors, clickData, chatIconElement) {
+      function showAmbassadorSidebar(ambassadors, clickData, chatIconElement, isLoading = false) {
         currentClickData = clickData;
+        
+        // Show sidebar immediately
+        if (ambassadorSidebar) {
+          ambassadorSidebar.style.display = 'flex';
+          setTimeout(() => {
+            ambassadorSidebar.classList.add('show');
+          }, 10);
+        }
+        
+        // If loading, show loading state
+        if (isLoading) {
+          ambassadorProfileContent.innerHTML = '<div style="padding: 40px; text-align: center; color: #666;"><div style="display: inline-block; width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite;"></div><p style="margin-top: 20px;">Loading ambassadors...</p></div>';
+          // Add spin animation if not already in style
+          if (!document.getElementById('loadingSpinnerStyle')) {
+            const style = document.createElement('style');
+            style.id = 'loadingSpinnerStyle';
+            style.textContent = '@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }';
+            document.head.appendChild(style);
+          }
+          return; // Exit early, will be called again with actual data
+        }
         
         // NOTE: We do NOT track click here when ambassadors exist
         // Click will only be tracked when user clicks "Ask me a question" button
